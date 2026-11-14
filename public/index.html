@@ -1,0 +1,1895 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#FFFFFF">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" href="/icons/icon-192.png">
+<link rel="apple-touch-icon" href="/icons/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>동네평</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Do+Hyeon&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* Layout idea: a local-life app shell. Sticky header (top tabs + search), category icon pager, two pick cards, then a two-column photo feed. Shops without photos appear as street signboards (간판); the brand mark is a red ink stamp (도장). */
+:root{
+  --desk:#E4E6E5; --bg:#F2F2F0; --surface:#FFFFFF; --fill:#F1F1EF; --press:#E8E8E5;
+  --ink:#1A1C1B; --muted:#6B706D; --line:#E2E3E0;
+  --brand:#DE3B28; --on-brand:#FFFFFF; --brand-soft:#FDECE8; --star:#F0A30A;
+  --warn-bg:#FFF4D6; --warn-ink:#5C4300;
+  --font-display:"Do Hyeon","IBM Plex Sans KR","Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+  --font-body:"IBM Plex Sans KR","Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif;
+  --tab-h:60px; --app-w:440px;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --desk:#060707; --bg:#0F1110; --surface:#1A1D1C; --fill:#232726; --press:#2A2F2D;
+    --ink:#ECEEED; --muted:#9BA19E; --line:#2C302E;
+    --brand:#FF6A55; --on-brand:#1E0905; --brand-soft:#3A1D18; --star:#F6C04B;
+    --warn-bg:#3A3112; --warn-ink:#F4E2A6; color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --desk:#060707; --bg:#0F1110; --surface:#1A1D1C; --fill:#232726; --press:#2A2F2D;
+  --ink:#ECEEED; --muted:#9BA19E; --line:#2C302E;
+  --brand:#FF6A55; --on-brand:#1E0905; --brand-soft:#3A1D18; --star:#F6C04B;
+  --warn-bg:#3A3112; --warn-ink:#F4E2A6; color-scheme:dark;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overflow:hidden}
+body{margin:0;background:var(--desk);color:var(--ink);font-family:var(--font-body);font-size:15px;line-height:1.5;overscroll-behavior-y:none}
+body.locked .phone{overflow:hidden}
+h1,h2,h3{font-weight:700;line-height:1.25;margin:0;text-wrap:balance}
+p{margin:0}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:3px solid var(--brand);outline-offset:2px}
+svg{display:block}
+img{max-width:100%}
+.phone{max-width:var(--app-w);margin:0 auto;height:100%;overflow-y:auto;overflow-x:hidden;overscroll-behavior-y:contain;-webkit-overflow-scrolling:touch;background:var(--bg);position:relative;
+  padding-bottom:calc(var(--tab-h) + env(safe-area-inset-bottom) + 16px)}
+@media (min-width:600px){.phone{box-shadow:0 0 0 1px var(--line),0 24px 64px rgba(0,0,0,.14)}}
+.ic{display:inline-grid;place-items:center}
+.ic svg{width:24px;height:24px}
+
+/* home header */
+.homehead{position:sticky;top:0;z-index:20;background:var(--surface);padding-top:env(safe-area-inset-top)}
+.toptabs{display:flex;gap:22px;padding:10px 16px 2px;overflow-x:auto;scrollbar-width:none}
+.toptabs::-webkit-scrollbar{display:none}
+.tt{background:none;border:0;padding:4px 0 8px;font-size:19px;font-weight:500;color:var(--muted);position:relative;white-space:nowrap;cursor:pointer;display:inline-flex;align-items:center;gap:2px}
+.tt[aria-pressed="true"]{color:var(--ink);font-weight:700}
+.tt[aria-pressed="true"]::after{content:"";position:absolute;left:50%;bottom:0;width:18px;height:3px;border-radius:2px;background:var(--brand);transform:translateX(-50%)}
+.tt .caret{font-size:11px;margin-left:2px}
+.srch{display:flex;align-items:center;gap:10px;padding:8px 16px 10px}
+.logo{width:42px;height:42px;border-radius:50%;border:2.5px solid var(--brand);color:var(--brand);font-family:var(--font-display);font-size:22px;
+  display:grid;place-items:center;transform:rotate(-10deg);flex:none;line-height:1;text-decoration:none}
+.sbox{flex:1;min-width:0;display:flex;align-items:center;gap:8px;border:2px solid var(--brand);border-radius:999px;height:46px;padding:0 4px 0 14px;background:var(--surface)}
+.sbox .ic{color:var(--muted)}
+.sbox .ic svg{width:20px;height:20px}
+.sbox input{flex:1;min-width:0;border:0;background:transparent;outline:none;height:100%;font-size:16px}
+.sgo{flex:none;height:36px;border-radius:999px;background:var(--brand);color:var(--on-brand);border:0;padding:0 16px;font-weight:600;cursor:pointer}
+
+/* category pager */
+.cats{background:var(--surface)}
+.catpager{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none}
+.catpager::-webkit-scrollbar{display:none}
+.catpage{flex:0 0 100%;scroll-snap-align:start;display:grid;grid-template-columns:repeat(5,1fr);row-gap:14px;padding:12px 6px 6px}
+.cbtn{display:grid;justify-items:center;gap:6px;background:none;border:0;font-size:13px;color:var(--ink);text-decoration:none;cursor:pointer;padding:0}
+.cbtn i{width:50px;height:50px;border-radius:16px;display:grid;place-items:center;font-family:var(--font-display);font-style:normal;font-size:24px;color:#fff;
+  box-shadow:inset 0 -5px 0 rgba(0,0,0,.14),inset 0 10px 14px rgba(255,255,255,.2)}
+.dots{display:flex;justify-content:center;gap:4px;padding:6px 0 12px}
+.dots i{width:6px;height:3px;border-radius:2px;background:var(--line)}
+.dots i.on{width:14px;background:var(--brand)}
+
+/* pick cards */
+.promos{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:8px 8px 0}
+.promo{border-radius:12px;padding:10px;text-decoration:none;color:inherit;display:grid;gap:8px;background:linear-gradient(180deg,var(--brand-soft),var(--surface) 60%);border:1px solid var(--line);min-width:0}
+.promo h3{font-size:15px;display:flex;align-items:baseline;gap:4px;flex-wrap:wrap}
+.promo h3 small{font-weight:400;color:var(--muted);font-size:12px}
+.pbody{display:flex;gap:8px;align-items:center;min-width:0}
+.pbody div{min-width:0}
+.pbody b{display:block;font-size:14px;font-weight:600;overflow-wrap:anywhere;line-height:1.3}
+.pbody small{font-size:12px;color:var(--brand)}
+.pbody small span{color:var(--muted);margin-left:4px}
+
+/* signboard thumbs */
+.thumb{width:78px;height:78px;border-radius:10px;flex:none;color:#fff;display:grid;place-items:center;font-family:var(--font-display);font-size:36px;position:relative;overflow:hidden}
+.thumb img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.thumb::before,.hero::before,.fsign::before{content:"";position:absolute;left:0;right:0;top:0;height:8px;z-index:1;
+  background:repeating-linear-gradient(90deg,rgba(255,255,255,.85) 0 12px,rgba(255,255,255,.2) 12px 24px)}
+.thumb.has-img::before{display:none}
+.thumb.sm{width:48px;height:48px;border-radius:8px;font-size:22px}
+.thumb.sm::before{height:4px}
+.thumb.xs{width:40px;height:40px;border-radius:8px;font-size:20px}
+.thumb.xs::before{height:4px}
+
+/* feed */
+.mcols{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:8px;align-items:start}
+.mcol{display:grid;gap:8px;min-width:0}
+.fcard{background:var(--surface);border-radius:10px;overflow:hidden;min-width:0}
+.flink{display:block;text-decoration:none;color:inherit}
+.fmedia{position:relative;display:block;background:var(--fill)}
+.fmedia img{width:100%;display:block;max-height:300px;min-height:140px;object-fit:cover}
+.fsign{position:relative;color:#fff;padding:24px 12px 12px;display:flex;flex-direction:column;justify-content:flex-end;gap:4px}
+.fsign small{font-size:12px;opacity:.92}
+.fsign strong{font-family:var(--font-display);font-weight:400;font-size:27px;line-height:1.1;overflow-wrap:anywhere}
+.ftag{position:absolute;left:8px;bottom:8px;background:rgba(0,0,0,.55);color:#fff;font-size:11px;border-radius:999px;padding:2px 8px;max-width:calc(100% - 16px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;z-index:1}
+.fcount{position:absolute;right:8px;top:8px;background:rgba(0,0,0,.55);color:#fff;font-size:11px;border-radius:999px;padding:1px 7px;z-index:1}
+.ftitle{padding:8px 10px 2px;font-size:14px;font-weight:600;line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere}
+.ffoot{display:flex;align-items:center;gap:6px;padding:6px 10px 10px;font-size:12px;color:var(--muted)}
+.ffoot .who{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.av{width:22px;height:22px;border-radius:50%;background:var(--fill);display:grid;place-items:center;font-size:11px;font-weight:700;color:var(--muted);flex:none}
+.like{display:inline-flex;align-items:center;gap:3px;background:none;border:0;color:var(--muted);font-size:13px;cursor:pointer;padding:6px;margin:-6px;font-variant-numeric:tabular-nums}
+.like svg{width:18px;height:18px}
+.like[aria-pressed="true"]{color:var(--brand)}
+.like[aria-pressed="true"] svg{fill:currentColor}
+
+/* lists */
+.list{background:var(--surface)}
+.srow{display:flex;gap:12px;padding:14px 16px;border-bottom:1px solid var(--line);text-decoration:none;color:inherit;align-items:flex-start}
+.srow:active{background:var(--press)}
+.rank{width:22px;flex:none;font-family:var(--font-display);font-size:22px;color:var(--muted);text-align:center;padding-top:24px;font-variant-numeric:tabular-nums}
+.rank.top{color:var(--brand)}
+.sinfo{min-width:0;flex:1;display:grid;gap:1px;align-content:start}
+.sname{font-weight:700;font-size:16px;overflow-wrap:anywhere}
+.score{display:flex;align-items:center;flex-wrap:wrap;gap:2px 6px;font-size:13px;color:var(--muted)}
+.score b{color:var(--brand);font-family:var(--font-display);font-weight:400;font-size:19px;line-height:1.1}
+.score .new{color:var(--brand);font-weight:600}
+.sub{font-size:13px;color:var(--muted);overflow-wrap:anywhere}
+.menuline{font-size:13px;overflow-wrap:anywhere}
+.badge{display:inline-block;font-size:11px;font-weight:500;border:1px solid var(--muted);color:var(--muted);border-radius:4px;padding:0 4px;margin-left:6px;vertical-align:2px}
+
+/* app bar */
+.appbar{position:sticky;top:0;z-index:20;background:var(--surface);border-bottom:1px solid var(--line);
+  padding:calc(env(safe-area-inset-top) + 8px) 12px 8px 16px;display:flex;align-items:center;gap:8px;min-height:56px}
+.appbar.withback{padding-left:4px}
+.appbar .title{flex:1;min-width:0;font-size:18px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.appbar .sbox{height:40px}
+.iconbtn{width:44px;height:44px;border-radius:50%;border:0;background:transparent;display:grid;place-items:center;cursor:pointer;color:var(--ink);flex:none;text-decoration:none}
+.iconbtn:active{background:var(--press)}
+.seg{display:flex;gap:18px;padding:0 16px;background:var(--surface);border-bottom:1px solid var(--line)}
+.seg button{background:none;border:0;padding:10px 0 8px;font-size:14px;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent}
+.seg button[aria-pressed="true"]{color:var(--ink);font-weight:700;border-color:var(--ink)}
+
+/* store detail */
+.hero{position:relative;color:#fff;padding:30px 20px 20px;min-height:200px;display:flex;flex-direction:column;justify-content:flex-end;gap:2px;overflow:hidden}
+.hero img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.hero.has-img::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,0) 35%,rgba(0,0,0,.7))}
+.hero.has-img::before{display:none}
+.hero small,.hero strong{position:relative;z-index:1}
+.hero small{font-size:13px;opacity:.92}
+.hero strong{font-family:var(--font-display);font-weight:400;font-size:clamp(34px,10vw,46px);line-height:1.1;overflow-wrap:anywhere}
+.block{background:var(--surface);padding:16px;margin-top:8px}
+.block-h{display:flex;align-items:baseline;gap:8px;margin-bottom:10px}
+.block-h h2{font-size:18px}
+.block-h small{color:var(--muted);font-size:14px}
+.summary{display:flex;align-items:center;gap:20px}
+.stamp{flex:none;width:96px;height:96px;border-radius:50%;border:4px solid var(--brand);color:var(--brand);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;transform:rotate(-8deg);line-height:1}
+.stamp b{font-family:var(--font-display);font-weight:400;font-size:40px;font-variant-numeric:tabular-nums}
+.stamp span{font-size:12px;margin-top:4px}
+.stamp.none{border-style:dashed;border-color:var(--line);color:var(--muted);transform:none}
+.stamp.none span{text-align:center;line-height:1.3;margin:0}
+.bars{flex:1;display:grid;gap:5px;font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums;min-width:0}
+.bars div{display:grid;grid-template-columns:26px 1fr 20px;gap:8px;align-items:center}
+.bars i{display:block;height:8px;border-radius:4px;background:var(--fill);overflow:hidden}
+.bars i u{display:block;height:100%;background:var(--star)}
+.info{margin:0;display:grid;grid-template-columns:auto 1fr;gap:6px 14px;font-size:14px}
+.info dt{color:var(--muted)}
+.info dd{margin:0;overflow-wrap:anywhere}
+.desc{white-space:pre-wrap;overflow-wrap:anywhere}
+.strip{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;margin:0 -16px;padding:0 16px}
+.strip::-webkit-scrollbar{display:none}
+.strip button{flex:none;width:96px;height:96px;padding:0;border:0;border-radius:8px;overflow:hidden;background:var(--fill);cursor:zoom-in}
+.strip img,.pgrid img{width:100%;height:100%;object-fit:cover;display:block}
+.rv{padding:14px 0;border-top:1px solid var(--line)}
+.rv:first-of-type{border-top:0;padding-top:4px}
+.rv-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px}
+.avatar{width:32px;height:32px;border-radius:50%;background:var(--fill);display:grid;place-items:center;font-size:14px;font-weight:700;color:var(--muted);flex:none}
+.rv-who{display:grid;line-height:1.3;min-width:0}
+.rv-who b{font-weight:600;font-size:14px;overflow-wrap:anywhere}
+.rv-who time{font-size:12px;color:var(--muted)}
+.stars{color:var(--star);letter-spacing:1px;white-space:nowrap;font-size:14px}
+.stars s{text-decoration:none;color:var(--line)}
+.rv-text{white-space:pre-wrap;overflow-wrap:anywhere;margin-top:4px}
+.pgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;margin-top:8px}
+.pgrid button{padding:0;border:0;border-radius:6px;overflow:hidden;aspect-ratio:1;background:var(--fill);cursor:zoom-in}
+.reply{margin-top:10px;background:var(--fill);border-radius:10px;padding:10px 12px;font-size:14px}
+.reply b{display:block;font-size:12px;color:var(--brand);font-weight:700;margin-bottom:2px}
+.reply span{white-space:pre-wrap;overflow-wrap:anywhere}
+.rv-actions{display:flex;gap:4px;margin-top:6px;align-items:center}
+.textbtn{background:none;border:0;padding:6px 8px;margin-left:-8px;font-size:13px;color:var(--brand);font-weight:600;cursor:pointer;border-radius:6px}
+.textbtn:active{background:var(--press)}
+
+/* my / boss */
+.tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.tile{background:var(--fill);border-radius:12px;padding:12px;display:grid;gap:2px}
+.tile b{font-family:var(--font-display);font-weight:400;font-size:28px;line-height:1;font-variant-numeric:tabular-nums}
+.tile span{font-size:12px;color:var(--muted)}
+.mrow{display:flex;align-items:center;gap:12px;padding:12px 0;border-top:1px solid var(--line)}
+.mrow:first-of-type{border-top:0}
+.mrow .grow{flex:1;min-width:0;text-decoration:none;color:inherit}
+.mrow .grow b{display:block;font-weight:600;overflow-wrap:anywhere}
+.mrow .grow small{color:var(--muted);font-size:13px;overflow-wrap:anywhere;display:block}
+.mbtns{display:flex;gap:6px;flex:none}
+
+/* buttons, forms */
+.btn{border:0;background:var(--brand);color:var(--on-brand);border-radius:12px;height:50px;padding:0 18px;font-weight:700;font-size:16px;cursor:pointer;
+  text-decoration:none;display:inline-flex;align-items:center;justify-content:center;gap:6px}
+.btn:active{filter:brightness(.92)}
+.btn .ic svg{width:20px;height:20px}
+.btn.wide{width:100%}
+.btn.ghost{background:var(--fill);color:var(--ink)}
+.btn.small{height:34px;border-radius:8px;font-size:13px;padding:0 12px;font-weight:600;background:var(--fill);color:var(--ink)}
+.btn.small.hot{background:var(--brand);color:var(--on-brand)}
+.btn.danger{background:transparent;color:var(--brand);border:1.5px solid var(--brand)}
+.btn[disabled]{opacity:.5;cursor:not-allowed}
+form{display:grid;gap:16px}
+label{display:grid;gap:6px;font-size:14px;font-weight:600}
+label small,.lbl small{font-weight:400;color:var(--muted)}
+.lbl{font-size:14px;font-weight:600;margin-bottom:6px}
+input[type=text],input[type=tel],select,textarea{background:var(--fill);border:1.5px solid transparent;border-radius:10px;padding:12px;width:100%;font-size:16px}
+input[type=text]:focus,input[type=tel]:focus,select:focus,textarea:focus{border-color:var(--brand);outline:none;background:var(--surface)}
+textarea{min-height:120px;resize:vertical}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.rate{display:flex;justify-content:center;gap:4px;border:0;padding:0;margin:0}
+.rate legend{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+.rate input{position:absolute;opacity:0;width:1px;height:1px}
+.rate label{display:block;font-size:42px;line-height:1;color:var(--line);cursor:pointer;padding:2px}
+.rate label.on{color:var(--star)}
+.rate input:focus-visible+label{outline:3px solid var(--brand);outline-offset:2px;border-radius:6px}
+.rate-word{text-align:center;font-size:14px;color:var(--muted);min-height:1.5em;margin-top:-6px}
+.picker{display:flex;gap:8px;flex-wrap:wrap}
+.pthumb{position:relative;width:80px;height:80px;border-radius:8px;overflow:hidden;background:var(--fill)}
+.pthumb img{width:100%;height:100%;object-fit:cover;display:block}
+.pthumb .rm{position:absolute;top:3px;right:3px;width:26px;height:26px;border-radius:50%;background:rgba(0,0,0,.62);color:#fff;border:0;display:grid;place-items:center;cursor:pointer;padding:0}
+.pthumb .rm svg{width:16px;height:16px}
+.padd{width:80px;height:80px;border:1.5px dashed var(--muted);border-radius:8px;display:grid;place-items:center;align-content:center;gap:2px;color:var(--muted);font-size:12px;font-weight:500;cursor:pointer;text-align:center}
+.padd input{position:absolute;width:1px;height:1px;opacity:0}
+.padd:focus-within{outline:3px solid var(--brand)}
+.err{color:var(--brand);font-size:14px;min-height:1.4em}
+.notice{background:var(--warn-bg);color:var(--warn-ink);padding:10px 14px;font-size:13px}
+.empty{padding:40px 24px;text-align:center;color:var(--muted);display:grid;gap:14px;justify-items:center}
+.lead{color:var(--muted);font-size:14px;margin-bottom:16px}
+.optlist{display:grid}
+.opt{display:flex;align-items:center;gap:12px;padding:12px 4px;border:0;border-top:1px solid var(--line);background:none;text-align:left;cursor:pointer;width:100%}
+.opt:first-child{border-top:0}
+.opt:active{background:var(--press)}
+.opt .grow{flex:1;min-width:0}
+.opt .grow b{display:block;font-weight:600;overflow-wrap:anywhere}
+.opt .grow small{color:var(--muted);font-size:13px}
+.opt[aria-current="true"] b{color:var(--brand)}
+
+/* fixed bars */
+.tabbar,.actionbar{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:var(--app-w);background:var(--surface);border-top:1px solid var(--line);z-index:30}
+.tabbar{height:calc(var(--tab-h) + env(safe-area-inset-bottom));padding-bottom:env(safe-area-inset-bottom);display:grid;grid-template-columns:repeat(5,1fr);align-items:center}
+.tab{display:grid;place-items:center;height:100%;font-size:16px;font-weight:500;color:var(--muted);text-decoration:none;background:none;border:0;cursor:pointer;padding:0}
+.tab[aria-current="page"]{color:var(--brand);font-weight:700}
+.tab.pill span{display:inline-flex;align-items:center;gap:2px;background:var(--brand);color:var(--on-brand);border-radius:999px;height:40px;padding:0 14px 0 10px;font-weight:700;font-size:15px;white-space:nowrap}
+.tab.pill .ic svg{width:18px;height:18px}
+body.no-tabs .tabbar{display:none}
+.actionbar{padding:10px 16px calc(10px + env(safe-area-inset-bottom));display:flex;gap:10px;align-items:center}
+.actionbar .btn{flex:1}
+.actionbar .like{margin:0;padding:6px 10px;flex-direction:column;gap:0;font-size:11px}
+.actionbar .like svg{width:24px;height:24px}
+
+
+/* added: rows with bookmark, chips, sections, trend strip, nearby */
+.srow{display:flex;align-items:stretch;padding:0;gap:0}
+.srow-link{display:flex;gap:12px;flex:1;min-width:0;padding:14px 0 14px 16px;text-decoration:none;color:inherit;align-items:flex-start}
+.srow-link:active{background:var(--press)}
+.favbtn{flex:none;background:none;border:0;color:var(--muted);cursor:pointer;padding:14px 14px;display:flex;align-items:flex-start}
+.favbtn .ic svg{width:22px;height:22px}
+.favbtn[aria-pressed="true"]{color:var(--brand)}
+.favbtn[aria-pressed="true"] svg{fill:currentColor}
+.favbtn.big{flex-direction:column;align-items:center;gap:0;font-size:11px;padding:4px 8px;min-width:64px}
+.note{display:flex;align-items:center;gap:2px;font-size:12px;color:var(--brand);font-weight:600}
+.note .ic svg{width:14px;height:14px}
+.chips{display:flex;gap:6px;overflow-x:auto;padding:10px 16px;background:var(--surface);scrollbar-width:none}
+.chips::-webkit-scrollbar{display:none}
+.chip{flex:none;border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:6px 12px;font-size:13px;cursor:pointer;white-space:nowrap}
+.chip[aria-pressed="true"]{background:var(--ink);color:var(--surface);border-color:var(--ink);font-weight:600}
+.groupbar{background:var(--surface);border-bottom:1px solid var(--line)}
+.secthead{background:var(--surface);padding:14px 16px 4px;display:grid;gap:2px}
+.secthead h2{font-size:18px}
+.secthead small{font-size:12px;color:var(--muted)}
+.tstrip{display:flex;gap:8px;overflow-x:auto;padding:10px 16px;background:var(--surface);scrollbar-width:none}
+.tstrip::-webkit-scrollbar{display:none}
+.tcard{flex:none;width:120px;text-decoration:none;color:inherit;display:grid;gap:4px;font-size:12px;font-weight:600}
+.tcard img{width:120px;height:150px;object-fit:cover;border-radius:10px;background:var(--fill)}
+.tcard span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hint{display:flex;gap:8px;align-items:flex-start;font-size:13px;color:var(--muted);padding:12px 16px;background:var(--surface);border-bottom:1px solid var(--line)}
+.hint .ic svg{width:18px;height:18px}
+.hint .ic{color:var(--brand);margin-top:1px}
+.mybar{display:flex;align-items:center;gap:10px;padding:12px 16px;background:var(--surface);border-bottom:1px solid var(--line)}
+.mybar>.ic{color:var(--brand)}
+.mybar .grow{flex:1;min-width:0;display:grid;line-height:1.3}
+.mybar small{font-size:12px;color:var(--muted)}
+.mybar b{overflow-wrap:anywhere}
+.maplinks{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:12px;font-size:14px;color:var(--muted)}
+.maplinks .ic svg{width:18px;height:18px}
+.maplinks span{margin-right:auto}
+button.promo{font:inherit;text-align:left;cursor:pointer;color:inherit}
+.cats .catpage{padding:12px 4px 8px;grid-template-columns:repeat(5,1fr);grid-template-rows:auto auto;row-gap:12px;align-content:start}
+.cats .dots{padding:2px 0 12px}
+.cats .cbtn{font-size:12px;line-height:1.3;text-align:center;word-break:keep-all;padding:0 1px}
+.cats .cbtn i{width:48px;height:48px;font-size:23px;border-radius:16px}
+.cbtn i.allicon{background:var(--ink);color:var(--surface)}
+
+/* added: settings, translation notes, address row */
+html.big body{zoom:1.15}
+.setwrap{display:grid;gap:12px;padding:12px}
+.setcard{background:var(--surface);border-radius:16px;overflow:hidden}
+.setrow{display:flex;align-items:center;gap:10px;width:100%;padding:16px;border:0;border-top:1px solid var(--line);background:none;text-align:left;cursor:pointer;color:var(--ink);text-decoration:none}
+.setcard>.setrow:first-child{border-top:0}
+.setrow:active{background:var(--press)}
+.setrow .grow{flex:1;min-width:0;display:grid;gap:2px}
+.setrow .grow b{font-weight:500;font-size:16px}
+.setrow .grow small{font-size:13px;color:var(--muted);line-height:1.4}
+.setrow .val{color:var(--muted);font-size:14px;max-width:45%;text-align:right;overflow-wrap:anywhere}
+.setrow>.ic{color:var(--muted)}
+.setrow>.ic svg{width:18px;height:18px}
+.switch{flex:none;width:48px;height:28px;border-radius:999px;background:var(--line);position:relative}
+.switch i{position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.25)}
+.setrow[aria-checked="true"] .switch{background:var(--brand)}
+.setrow[aria-checked="true"] .switch i{left:23px}
+.setnote{font-size:13px;color:var(--warn-ink);background:var(--warn-bg);padding:10px 16px}
+.guide{margin:0;padding-left:20px;display:grid;gap:10px;font-size:15px}
+.trb{display:grid;gap:4px}
+.trnote{display:inline-flex;align-items:center;gap:4px;justify-self:start;background:none;border:0;padding:4px 0;font-size:12px;color:var(--brand);font-weight:600;cursor:pointer;text-decoration:none}
+.trnote.busy{color:var(--muted);font-weight:500;cursor:default}
+.trnote .ic svg{width:14px;height:14px}
+.reply .trb p{white-space:pre-wrap;overflow-wrap:anywhere}
+.addr{display:flex;align-items:center;gap:8px;margin-top:12px;padding-top:12px;border-top:1px solid var(--line)}
+.block>.addr:first-child{margin-top:0;padding-top:0;border-top:0}
+.addr-text{flex:1;min-width:0;display:grid;gap:2px;background:none;border:0;padding:0;text-align:left;cursor:pointer;color:var(--ink)}
+.addr-text b{font-weight:600;font-size:15px;overflow-wrap:anywhere}
+.addr-text small{font-size:12px;color:var(--muted)}
+.act{flex:none;display:grid;justify-items:center;gap:2px;background:none;border:0;cursor:pointer;color:var(--ink);font-size:12px;padding:0 4px;min-width:52px}
+.act .ic{width:44px;height:44px;border-radius:12px;background:var(--fill)}
+.act .ic svg{width:22px;height:22px}
+.act.off{color:var(--muted)}
+.addrbox{display:flex;align-items:center;gap:10px;background:var(--fill);border-radius:10px;padding:12px}
+.addrbox b{flex:1;min-width:0;overflow-wrap:anywhere;font-weight:600}
+.opt>.ic{color:var(--brand)}
+a.opt{text-decoration:none;color:inherit}
+.bignum{font-family:var(--font-display);font-size:34px;text-align:center;user-select:all;font-variant-numeric:tabular-nums}
+
+/* added: closed days, delete dialog */
+.daypick{display:flex;flex-wrap:wrap;gap:6px}
+.daychip{border:1.5px solid var(--line);background:var(--surface);border-radius:999px;padding:7px 12px;font-size:14px;cursor:pointer;color:var(--ink)}
+.daychip.day{min-width:44px}
+.daychip[aria-pressed="true"]{background:var(--brand);border-color:var(--brand);color:var(--on-brand);font-weight:600}
+.offday{display:inline-block;font-size:11px;font-weight:700;color:var(--brand);background:var(--brand-soft);border-radius:4px;padding:1px 6px;margin-left:6px;vertical-align:2px;white-space:nowrap}
+.dscrim{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:75;display:grid;place-items:center;padding:24px}
+.dialog{background:var(--surface);border-radius:18px;width:100%;max-width:340px;padding:22px 20px 18px;display:grid;gap:10px;text-align:center;box-shadow:0 20px 50px rgba(0,0,0,.3)}
+.dlg-mark{width:44px;height:44px;border-radius:50%;background:var(--brand-soft);color:var(--brand);font-family:var(--font-display);font-size:28px;display:grid;place-items:center;justify-self:center;line-height:1}
+.dialog h2{font-size:19px}
+.dlg-body{display:grid;gap:4px;font-size:14px;color:var(--muted)}
+.dlg-body p:first-child{color:var(--ink);font-weight:600;font-size:15px;overflow-wrap:anywhere}
+.dlg-btns{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:4px}
+.dlg-btns .btn{height:46px}
+@media (prefers-reduced-motion:no-preference){.dialog{animation:pop .18s ease-out}@keyframes pop{from{transform:scale(.94);opacity:0}to{transform:none;opacity:1}}}
+
+/* added: gallery, adult badge, check row */
+.galwrap{position:relative;background:var(--surface)}
+.gallery{display:flex;gap:6px;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none;padding:0;background:var(--ink)}
+.gallery::-webkit-scrollbar{display:none}
+.gtile{flex:0 0 78%;height:250px;padding:0;border:0;position:relative;scroll-snap-align:start;cursor:zoom-in;background:#222;overflow:hidden}
+.gtile:only-child{flex-basis:100%}
+.gtile img{width:100%;height:100%;object-fit:cover;display:block}
+.gtag{position:absolute;left:8px;bottom:8px;background:rgba(0,0,0,.55);color:#fff;font-size:11px;border-radius:999px;padding:2px 8px}
+.gcount{position:absolute;right:10px;top:10px;background:rgba(0,0,0,.6);color:#fff;font-size:12px;border-radius:999px;padding:2px 9px;font-variant-numeric:tabular-nums;pointer-events:none}
+.titleblock{padding:14px 16px 12px;display:grid;gap:4px;justify-items:start}
+.titleblock small{font-size:13px;color:var(--muted)}
+.titleblock h1{font-family:var(--font-display);font-weight:400;font-size:clamp(28px,8vw,36px);line-height:1.15;overflow-wrap:anywhere}
+.adult{display:inline-flex;align-items:center;gap:6px;vertical-align:2px;margin-left:6px}
+.adult b{display:inline-grid;place-items:center;min-width:26px;height:20px;padding:0 4px;border:2px solid #D32F2F;border-radius:999px;color:#D32F2F;background:#fff;font-size:11px;font-weight:800;line-height:1;font-family:var(--font-body)}
+.adult.big{margin-left:0;background:#fff;border-radius:999px;padding:3px 10px 3px 3px;font-size:13px;font-weight:700;color:#D32F2F;border:1px solid #F3C2C2}
+.adult.big b{height:24px;min-width:32px;font-size:12px}
+.fadult{position:absolute;right:8px;top:8px;z-index:2}
+.fadult .adult{margin:0}
+.check{display:flex;gap:10px;align-items:flex-start;background:var(--fill);border-radius:10px;padding:12px;cursor:pointer}
+.check input{width:20px;height:20px;margin:2px 0 0;accent-color:var(--brand);flex:none}
+.check>span{display:grid;gap:3px}
+.check b{font-weight:600}
+.check small{font-weight:400;color:var(--muted);line-height:1.4}
+.vtrack{position:absolute;inset:0;display:flex;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none}
+.vtrack::-webkit-scrollbar{display:none}
+.vslide{flex:0 0 100%;scroll-snap-align:start;display:grid;place-items:center;padding:56px 12px;position:relative}
+.vslide img{max-width:100%;max-height:100%;object-fit:contain}
+.vtag{position:absolute;left:50%;bottom:calc(env(safe-area-inset-bottom) + 18px);transform:translateX(-50%);color:#fff;font-size:13px;opacity:.85;white-space:nowrap}
+.vcount{position:absolute;top:calc(env(safe-area-inset-top) + 18px);left:50%;transform:translateX(-50%);color:#fff;font-size:14px;font-variant-numeric:tabular-nums}
+.vnav{position:absolute;top:50%;transform:translateY(-50%);width:44px;height:44px;border-radius:50%;border:0;background:rgba(255,255,255,.16);color:#fff;display:grid;place-items:center;cursor:pointer}
+.vnav.prev{left:8px}.vnav.next{right:8px}
+.viewer .vclose{position:absolute;top:calc(env(safe-area-inset-top) + 8px);right:8px;color:#fff}
+.viewer{cursor:default}
+
+/* added: hours/phone pickers, photo strips */
+.timerow{display:grid;grid-template-columns:1fr auto 1fr;align-items:end;gap:8px;margin-top:10px}
+.tilde{font-size:18px;color:var(--muted);padding-bottom:12px}
+.tnote{font-size:12px;color:var(--brand);margin-top:6px;min-height:0}
+.tnote:empty{display:none}
+.phonerow{display:grid;grid-template-columns:minmax(0,1.1fr) auto minmax(0,1fr);align-items:center;gap:6px}
+.phonerow .tilde{padding:0}
+.tip{display:block;font-size:12px;font-weight:500;color:var(--brand)}
+.strip.big button{width:150px;height:150px;border-radius:10px}
+.hero .herozoom{position:absolute;inset:0;z-index:1;background:none;border:0;cursor:zoom-in;padding:0}
+.hero small,.hero strong{pointer-events:none}
+
+/* sign-in */
+.lgwrap{display:grid;gap:10px}
+.sbtn{display:flex;align-items:center;justify-content:center;gap:10px;height:50px;border-radius:12px;border:1px solid var(--line);font-weight:700;font-size:15px;cursor:pointer;background:var(--surface);color:var(--ink)}
+.sbtn .slogo{width:24px;height:24px;border-radius:6px;display:grid;place-items:center;font-weight:800;font-size:14px}
+.sbtn.kakao{background:#FEE500;border-color:#FEE500;color:#191919}
+.sbtn.kakao .slogo{background:#191919;color:#FEE500}
+.sbtn.naver{background:#03C75A;border-color:#03C75A;color:#fff}
+.sbtn.naver .slogo{background:#fff;color:#03C75A}
+.sbtn.google .slogo{background:#4285F4;color:#fff}
+.lgdiv{display:flex;align-items:center;gap:10px;color:var(--muted);font-size:13px;margin:6px 0}
+.lgdiv::before,.lgdiv::after{content:"";flex:1;height:1px;background:var(--line)}
+.lgform{gap:12px}
+.lgrow{display:flex;justify-content:space-between;flex-wrap:wrap;gap:4px}
+input[type=email],input[type=password]{background:var(--fill);border:1.5px solid transparent;border-radius:10px;padding:12px;width:100%;font-size:16px}
+input[type=email]:focus,input[type=password]:focus{border-color:var(--brand);outline:none;background:var(--surface)}
+.logincard{display:flex;align-items:center;gap:12px;justify-content:space-between}
+.logincard>div{display:grid;gap:2px;min-width:0}
+.logincard small{color:var(--muted);font-size:13px}
+/* sheet, viewer, toast */
+.scrim{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:50;display:flex;align-items:flex-end;justify-content:center}
+.sheet{background:var(--surface);width:100%;max-width:var(--app-w);border-radius:20px 20px 0 0;max-height:92%;overflow-y:auto;padding:6px 16px calc(18px + env(safe-area-inset-bottom))}
+.handle{width:40px;height:5px;border-radius:3px;background:var(--line);margin:4px auto 6px}
+.sheet-h{display:flex;align-items:center;gap:8px;margin-bottom:12px}
+.sheet-h h2{flex:1;min-width:0;font-size:18px;overflow-wrap:anywhere}
+.sheet-h .iconbtn{margin-right:-10px}
+.quote{background:var(--fill);border-radius:10px;padding:10px 12px;font-size:14px;color:var(--muted);white-space:pre-wrap;overflow-wrap:anywhere}
+.viewer{position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:70;display:grid;place-items:center;padding:16px;cursor:zoom-out}
+.viewer img{max-width:100%;max-height:100%;object-fit:contain}
+.viewer .iconbtn{position:absolute;top:calc(env(safe-area-inset-top) + 8px);right:8px;color:#fff}
+.toast{position:fixed;left:50%;bottom:calc(var(--tab-h) + env(safe-area-inset-bottom) + 18px);transform:translateX(-50%);
+  background:var(--ink);color:var(--surface);padding:10px 18px;border-radius:999px;font-size:14px;z-index:80;opacity:0;pointer-events:none;max-width:calc(100% - 32px);text-align:center}
+.toast.show{opacity:1}
+@media (prefers-reduced-motion:no-preference){
+  .sheet{animation:up .22s ease-out}
+  .scrim{animation:fade .2s ease-out}
+  .toast{transition:opacity .2s}
+  @keyframes up{from{transform:translateY(40px);opacity:.4}to{transform:none;opacity:1}}
+  @keyframes fade{from{opacity:0}to{opacity:1}}
+}
+</style>
+</head>
+<body>
+<div class="phone" id="scroller"><div id="app"><p class="empty">불러오는 중입니다…</p></div></div>
+<nav class="tabbar" id="tabbar" aria-label="하단 메뉴" data-ta="하단 메뉴">
+  <a class="tab" href="#home" data-r="home" data-t="홈">홈</a>
+  <a class="tab" href="#boss" data-r="boss" data-t="사장님">사장님</a>
+  <button class="tab pill" type="button" id="write-pill"><span><span class="ic" data-icon="plus"></span><span data-t="리뷰">리뷰</span></span></button>
+  <a class="tab" href="#favs" data-r="favs" data-t="즐겨찾기">즐겨찾기</a>
+  <a class="tab" href="#my" data-r="my" data-t="마이">마이</a>
+</nav>
+<div id="sheet-root"></div>
+<div id="viewer-root"></div>
+<div id="dialog-root"></div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script src="/firebase-config.js"></script>
+<script type="module">
+import * as appMod from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import * as authMod from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import * as fsMod from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+const fb=Object.assign({},appMod,authMod,fsMod);
+(function(){
+"use strict";
+var GROUPS=[
+  {name:"맛집",glyph:"맛",color:"#C23B2A",subs:["한식","중식","일식","양식","분식","치킨","피자","고기·구이","해산물","아시안","패스트푸드","기타·맛집"]},
+  {name:"카페·디저트",glyph:"커",color:"#7A5A43",subs:["카페","베이커리","디저트","기타·카페·디저트"]},
+  {name:"술집·바",glyph:"술",color:"#3A3F8F",subs:["호프·포차","이자카야","와인·칵테일바","기타·술집·바"]},
+  {name:"엔터테인먼트",glyph:"놀",color:"#7B3FA0",subs:["노래방","PC방","방탈출·보드게임","영화관","공연·전시","볼링·당구","키즈카페","기타·엔터테인먼트"]},
+  {name:"관광지",glyph:"관",color:"#2E7A55",subs:["랜드마크","자연·공원","박물관·미술관","전통시장·거리","테마파크","기타·관광지"]},
+  {name:"핫플",glyph:"핫",color:"#E0701F",subs:["포토스팟","팝업스토어","루프탑·야경","소품샵","기타·핫플"]},
+  {name:"뷰티·건강",glyph:"뷰",color:"#A8507E",subs:["미용실","네일","마사지·스파","피부관리","기타·뷰티·건강"]},
+  {name:"숙박",glyph:"숙",color:"#2C5D8A",subs:["호텔","펜션·풀빌라","게스트하우스","기타·숙박"]},
+  {name:"쇼핑",glyph:"쇼",color:"#8E7212",subs:["백화점·몰","옷가게","편집숍","기타·쇼핑"]},
+  {name:"생활",glyph:"생",color:"#4B5C66",subs:["병원·약국","세탁·수선","기타·생활"]},
+  {name:"기타",glyph:"기",color:"#767B82",subs:["기타"]}
+];
+var SUB2G={};GROUPS.forEach(function(g,i){g.subs.forEach(function(s){SUB2G[s]=i})});
+var LEGACY={"클럽":"기타·술집·바","치킨·피자":"치킨","카페·디저트":"카페","술집":"호프·포차","미용·뷰티":"미용실","생활·기타":"기타"};
+function normCat(c){c=LEGACY[c]||c;return SUB2G[c]!=null?c:"기타"}
+function groupOf(s){return GROUPS[SUB2G[s.cat]]}
+function catLabel(c){return c.indexOf("기타·")===0?T("기타"):T(c)}
+function colorOf(s){return groupOf(s).color}
+var DAY=86400000;
+var CLOSED=[["mon","월"],["tue","화"],["wed","수"],["thu","목"],["fri","금"],["sat","토"],["sun","일"],["hol","공휴일"],["fest","명절(설·추석)"],["irr","부정기 휴무"],["none","연중무휴"]];
+var CLOSED_CODES=CLOSED.map(function(c){return c[0]});
+function closedText(list){
+  if(!list.length)return"";
+  if(list.indexOf("none")>=0)return T("연중무휴");
+  return CLOSED.filter(function(c){return list.indexOf(c[0])>=0}).map(function(c){return T(c[1])}).join(", ");
+}
+var TIMES=[];for(var tq=0;tq<=48;tq++)TIMES.push(("0"+Math.floor(tq/2)).slice(-2)+":"+(tq%2?"30":"00"));
+function isTime(t){return typeof t==="string"&&TIMES.indexOf(t)>=0}
+function hoursText(s){
+  if(s.h24)return T("24시간 영업");
+  if(s.open&&s.close)return s.open+" ~ "+(s.close<=s.open?T("다음날 "):"")+s.close;
+  return s.hours?trText(s.hours):"";
+}
+var PHONE_PRE=[["010","휴대폰"],["02","서울"],["031","경기"],["032","인천"],["033","강원"],["041","충남"],["042","대전"],["043","충북"],["044","세종"],
+  ["051","부산"],["052","울산"],["053","대구"],["054","경북"],["055","경남"],["061","전남"],["062","광주"],["063","전북"],["064","제주"],["070","인터넷 전화"],["rep","대표번호 (1588 등)"]];
+function fmtRest(d){return d.length>7?d.slice(0,4)+"-"+d.slice(4,8):d.length>3?d.slice(0,3)+"-"+d.slice(3):d}
+function splitPhone(ph){
+  var d=(ph||"").replace(/[^0-9]/g,"");
+  if(!d)return{pre:"010",rest:""};
+  if(/^1[5-9]\d{6}$/.test(d))return{pre:"rep",rest:fmtRest(d)};
+  var best="";PHONE_PRE.forEach(function(p){if(p[0]!=="rep"&&d.indexOf(p[0])===0&&p[0].length>best.length)best=p[0]});
+  return best?{pre:best,rest:fmtRest(d.slice(best.length))}:{pre:"010",rest:fmtRest(d)};
+}
+function normAddr(t){return (t||"").replace(/[\s.,·\-()]/g,"").toLowerCase()}
+function findDup(id,area,address,name){
+  var a=normAddr(area),ad=normAddr(address==="예시 주소"?"":address),nm=normAddr(name);
+  return M().stores.find(function(s){
+    if(s.id===id||normAddr(s.area)!==a)return false;
+    var sad=normAddr(s.address==="예시 주소"?"":s.address);
+    if(ad&&sad)return ad===sad;
+    return normAddr(s.name)===nm;
+  })||null;
+}
+function closedToday(s){var d=["sun","mon","tue","wed","thu","fri","sat"][new Date().getDay()];return s.closed.indexOf(d)>=0}
+var PRICES=["1만원 이하","1~2만원","2~4만원","4만원 이상","해당 없음"];
+var RATE_WORD=["","별로예요","아쉬워요","보통이에요","좋았어요","최고예요"];
+var ICONS={
+  plus:'<path d="M12 5v14M5 12h14"/>',
+  back:'<path d="M15 18l-6-6 6-6"/>',
+  search:'<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>',
+  close:'<path d="M6 6l12 12M18 6 6 18"/>',
+  pen:'<path d="M4 20h4L19 9l-4-4L4 16z"/>',
+  heart:'<path d="M12 20s-7.5-4.6-7.5-10.2A4.3 4.3 0 0 1 12 7.2a4.3 4.3 0 0 1 7.5 2.6C19.5 15.4 12 20 12 20z"/>',
+  camera:'<path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/>',
+  bookmark:'<path d="M6 3h12v18l-6-4.5L6 21z"/>',
+  pin:'<path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/>',
+  up:'<path d="M5 15l7-7 7 7"/>',
+  map:'<path d="M9 4 3 6.5v13L9 17l6 2.5 6-2.5v-13L15 6.5 9 4z"/><path d="M9 4v13M15 6.5v13"/>',
+  phone:'<path d="M5 4h3.5l1.8 4.4-2.2 1.4a11 11 0 0 0 6.1 6.1l1.4-2.2L20 15.5V19a1.5 1.5 0 0 1-1.6 1.5C10.6 20 4 13.4 3.5 5.6A1.5 1.5 0 0 1 5 4z"/>',
+  gear:'<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>',
+  globe:'<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/>',
+  chev:'<path d="M9 6l6 6-6 6"/>',
+  copy:'<rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h8"/>'
+};
+function svg(n){return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+ICONS[n]+'</svg>'}
+function icon(n){var s=document.createElement("span");s.className="ic";s.innerHTML=svg(n);return s}
+document.querySelectorAll("[data-icon]").forEach(function(el){el.innerHTML=svg(el.getAttribute("data-icon"))});
+
+var scroller=document.getElementById("scroller");
+var S={db:null,user:null,assets:null,uid:null,canWrite:null,status:"loading",note:"",
+  stores:new Map(),reviews:new Map(),replies:new Map(),likes:new Map(),favs:new Map(),got:{},ver:0,
+  q:"",region:"전국",homeTab:"feed",catSort:"rating",rankGroup:-1,allGroup:-1,sub:"",subGroup:-1,editId:null,pending:false,confirm:null,backHash:"#home",sheet:false};
+
+/* ---------- helpers ---------- */
+function h(tag,attrs){
+  var el=document.createElement(tag),i,k;
+  if(attrs)for(k in attrs){
+    var v=attrs[k];
+    if(v==null||v===false)continue;
+    if(k==="text")el.textContent=v;
+    else if(k.slice(0,2)==="on")el.addEventListener(k.slice(2),v);
+    else if(k==="class")el.className=v;
+    else if(k==="value")el.value=v;
+    else if(k==="style")el.style.cssText=v;
+    else el.setAttribute(k,v===true?"":v);
+  }
+  for(i=2;i<arguments.length;i++){
+    var c=arguments[i];
+    if(c==null||c===false)continue;
+    if(Array.isArray(c))c.forEach(function(x){if(x)el.append(x)});
+    else el.append(c);
+  }
+  return el;
+}
+function str(v,max){return typeof v==="string"?v.slice(0,max||200):""}
+function first(s){return Array.from(s||"?")[0]||"?"}
+function newId(){var s="";while(s.length<12)s+=Math.random().toString(36).slice(2);return s.slice(0,12)}
+function cleanIds(a,max){return Array.isArray(a)?a.filter(function(x){return typeof x==="string"&&/^fs:[a-z0-9]{8,32}$/.test(x)}).slice(0,max):[]}
+var PHOTO={},PHLOAD={};
+function phSrc(id){return "data:image/svg+xml,"+encodeURIComponent("<svg xmlns='http://www.w3.org/2000/svg' width='4' height='3'><rect width='4' height='3' fill='#e4e5e2'/><!--"+id+"--></svg>")}
+function blob(u){
+  if(typeof u!=="string"||u.indexOf("fs:")!==0)return phSrc("x");
+  var id=u.slice(3);if(PHOTO[id])return PHOTO[id];
+  loadPhoto(id);return phSrc(id);
+}
+function loadPhoto(id){
+  if(PHLOAD[id]||!S.fs)return;PHLOAD[id]=1;
+  fb.getDoc(fb.doc(S.fs,"photos",id)).then(function(d){
+    var x=d.exists()?d.data():null;
+    if(!x||typeof x.data!=="string"||x.data.indexOf("data:image/")!==0)return;
+    PHOTO[id]=x.data;var ph=phSrc(id);
+    document.querySelectorAll("img").forEach(function(img){if(img.getAttribute("src")===ph)img.setAttribute("src",x.data)});
+  },function(){PHLOAD[id]=0});
+}
+function fmtDate(ms){
+  if(typeof ms!=="number"||!isFinite(ms))return"";
+  var m=Math.floor((Date.now()-ms)/60000);
+  if(m<1)return T("방금");if(m<60)return m+T("분 전");
+  var hr=Math.floor(m/60);if(hr<24)return hr+T("시간 전");
+  var d=Math.floor(hr/24);if(d<7)return d+T("일 전");
+  var dt=new Date(ms);return dt.getFullYear()+". "+(dt.getMonth()+1)+". "+dt.getDate()+".";
+}
+function lsGet(k){try{return localStorage.getItem(k)||""}catch(e){return""}}
+function lsSet(k,v){try{localStorage.setItem(k,v)}catch(e){}}
+function stars(n){var el=h("span",{class:"stars","aria-label":T("별점 ")+n+T("점")});el.append("★".repeat(n));if(n<5)el.append(h("s",{text:"★".repeat(5-n)}));return el}
+var toastT;
+function toast(msg){var t=document.getElementById("toast");t.textContent=msg;t.classList.add("show");clearTimeout(toastT);toastT=setTimeout(function(){t.classList.remove("show")},2200)}
+function regionOf(s){return (s.area||"").trim().split(/\s+/)[0]||"기타"}
+function inRegion(s){return S.region==="전국"||regionOf(s)===S.region}
+function hashNum(s){var x=0;for(var i=0;i<s.length;i++)x=(x*31+s.charCodeAt(i))|0;return Math.abs(x)}
+
+/* ---------- language, settings, translation ---------- */
+var LANGS=[["ko","한국어"],["en","English"],["ja","日本語"],["zh","中文(简体)"]];
+var LANG_NAME={ko:"Korean",en:"English",ja:"Japanese",zh:"Simplified Chinese"};
+function isLang(v){return LANGS.some(function(l){return l[0]===v})}
+(function(){
+  var v=lsGet("dnp-lang"),n=((navigator.language||"ko")+"").slice(0,2).toLowerCase();
+  S.lang=isLang(v)?v:(isLang(n)?n:"ko");
+  S.autoTr=lsGet("dnp-autotr")!=="0";S.big=lsGet("dnp-big")==="1";S.theme=lsGet("dnp-theme")||"system";
+  S.showOrig={};S.trState="idle";S.sample=null;
+})();
+function T(k){if(S.lang==="ko")return k;var d=I18N[S.lang],v=d&&d[k];return v!=null?v:k}
+function clip(t,n){t=t||"";return t.length>n?t.slice(0,n)+"…":t}
+var themeSet=false;
+function applySettings(){
+  var root=document.documentElement;
+  root.lang=S.lang==="zh"?"zh-CN":S.lang;
+  root.classList.toggle("big",S.big);
+  if(S.theme==="light"||S.theme==="dark"){root.setAttribute("data-theme",S.theme);themeSet=true}
+  else if(themeSet){root.removeAttribute("data-theme");themeSet=false}
+  document.querySelectorAll("[data-t]").forEach(function(el){el.textContent=T(el.getAttribute("data-t"))});
+  document.querySelectorAll("[data-ta]").forEach(function(el){el.setAttribute("aria-label",T(el.getAttribute("data-ta")))});
+}
+function copyText(t){
+  try{navigator.clipboard.writeText(t).then(function(){toast(T("복사했어요"))},function(){toast(T("복사하지 못했어요. 길게 눌러 직접 복사해 주세요"))})}
+  catch(e){toast(T("복사하지 못했어요. 길게 눌러 직접 복사해 주세요"))}
+}
+
+function detectLang(t){
+  if(!t)return null;
+  var ko=(t.match(/[가-힣]/g)||[]).length,kana=(t.match(/[぀-ヿ]/g)||[]).length,
+      han=(t.match(/[一-鿿]/g)||[]).length,lat=(t.match(/[A-Za-z]/g)||[]).length;
+  if(ko&&ko*2>=han&&ko>=kana)return"ko";
+  if(kana)return"ja";
+  if(han)return"zh";
+  if(lat>=3)return"en";
+  return null;
+}
+var TRC={},TRFAIL={},trQueue=[],trInflight={},trTimer=null,trBusy=false;
+function trCacheFor(lang){
+  if(!TRC[lang]){try{TRC[lang]=JSON.parse(lsGet("dnp-tr-"+lang)||"{}")||{}}catch(e){TRC[lang]={}}}
+  return TRC[lang];
+}
+function trSave(lang){
+  var c=trCacheFor(lang),keys=Object.keys(c);
+  if(keys.length>600)keys.slice(0,keys.length-600).forEach(function(k){delete c[k]});
+  lsSet("dnp-tr-"+lang,JSON.stringify(c));
+}
+function trKey(t){return t.length+"_"+hashNum(t).toString(36)}
+function needsTr(t){var l=detectLang(t);return !!(S.autoTr&&l&&l!==S.lang)}
+function trText(t){return t}
+function gtUrl(t){return "https://translate.google.com/?sl=auto&tl="+(S.lang==="zh"?"zh-CN":S.lang)+"&op=translate&text="+encodeURIComponent((t||"").slice(0,1500))}
+// 무료 요금제: 서버 번역 대신, 다른 언어로 쓴 글 아래에 Google 번역 버튼을 보여 줍니다.
+function trBlock(t,cls){
+  var wrap=h("div",{class:"trb"},h("p",{class:cls,text:t}));
+  if(t&&needsTr(t))wrap.append(h("a",{class:"trnote",href:gtUrl(t),target:"_blank",rel:"noopener"},icon("globe"),T("Google 번역으로 보기")));
+  return wrap;
+}
+
+/* ---------- settings ---------- */
+function setRow(label,value,onclick,sub){
+  return h("button",{type:"button",class:"setrow",onclick:onclick},
+    h("div",{class:"grow"},h("b",{text:label}),sub?h("small",{text:sub}):null),
+    value?h("span",{class:"val",text:value}):null,icon("chev"));
+}
+function setSwitch(label,sub,on,onchange){
+  return h("button",{type:"button",class:"setrow",role:"switch","aria-checked":String(on),onclick:function(){onchange(!on)}},
+    h("div",{class:"grow"},h("b",{text:label}),sub?h("small",{text:sub}):null),
+    h("span",{class:"switch","aria-hidden":"true"},h("i",{})));
+}
+function langName(c){for(var i=0;i<LANGS.length;i++)if(LANGS[i][0]===c)return LANGS[i][1];return c}
+function themeName(t){return t==="light"?T("밝게"):t==="dark"?T("어둡게"):T("기기 설정 따르기")}
+function viewSettings(){
+  var nick=lsGet("dnp-nick"),area=lsGet("dnp-area");
+  var stored=0;try{for(var i=0;i<localStorage.length;i++){var k=localStorage.key(i);if(k&&k.indexOf("dnp-tr-")===0)stored+=Object.keys(JSON.parse(localStorage.getItem(k)||"{}")).length}}catch(e){}
+  return[appbar(T("설정"),"#my"),banner(),
+    h("div",{class:"setwrap"},
+      h("section",{class:"setcard"},
+        setRow(T("계정"),accountLabel(),accountSheet,S.account?T("로그아웃하려면 누르세요"):T("구글 또는 이메일로 로그인")),
+        setRow(T("프로필"),nick||T("익명 손님"),nickSheet,T("리뷰에 보이는 닉네임")),
+        setRow(T("내 동네"),area||T("설정 안 함"),areaSheet,T("주변 탭에서 가까운 곳을 찾을 때 씁니다"))),
+      h("section",{class:"setcard"},
+        setRow(S.lang==="en"?"Language":T("언어")+" · Language",langName(S.lang),langSheet),
+        setSwitch(T("번역 버튼 보이기"),T("다른 언어로 쓴 리뷰·답글·가게 소개 아래에 'Google 번역으로 보기' 버튼을 보여 줘요."),S.autoTr,function(v){
+          S.autoTr=v;lsSet("dnp-autotr",v?"1":"0");if(v&&S.trState!=="blocked")S.trState="idle";render();
+        })),
+      h("section",{class:"setcard"},
+        setSwitch(T("큰 글씨 모드"),T("글씨와 버튼을 크게 보여 줘요"),S.big,function(v){S.big=v;lsSet("dnp-big",v?"1":"0");applySettings();render()}),
+        setRow(T("화면 테마"),themeName(S.theme),themeSheet)),
+      h("section",{class:"setcard"},
+        setRow(T("기기에 저장된 데이터"),"",clearSheet,T("내 동네, 닉네임")),
+        setRow(T("이용 안내"),"",guideSheet),
+        setRow(T("앱 정보"),T("동네평 미리보기 1.0"),function(){toast(T("동네평 미리보기 1.0"))})))];
+}
+function optionSheet(title,items,cur,onpick){
+  openSheet(title,h("div",{class:"optlist"},items.map(function(it){
+    return h("button",{type:"button",class:"opt","aria-current":String(cur===it[0]),onclick:function(){closeSheet(true);onpick(it[0])}},
+      h("div",{class:"grow"},h("b",{text:it[1]}),it[2]?h("small",{text:it[2]}):null));
+  })));
+}
+function langSheet(){
+  optionSheet(S.lang==="en"?"Language":T("언어")+" · Language",LANGS.map(function(l){return[l[0],l[1],LANG_NAME[l[0]]]}),S.lang,function(v){
+    S.lang=v;lsSet("dnp-lang",v);S.ver++;S.showOrig={};S.trState=S.trState==="blocked"?"blocked":"idle";
+    trQueue=[];applySettings();render();toast(T("언어를 바꿨어요"));
+  });
+}
+function themeSheet(){
+  optionSheet(T("화면 테마"),[["system",T("기기 설정 따르기")],["light",T("밝게")],["dark",T("어둡게")]],S.theme,function(v){
+    S.theme=v;lsSet("dnp-theme",v);applySettings();render();
+  });
+}
+function nickSheet(){
+  var inp=h("input",{type:"text",id:"set-nick",maxlength:"12",placeholder:T("익명 손님"),value:lsGet("dnp-nick")});
+  openSheet(T("프로필"),h("form",{onsubmit:function(e){e.preventDefault();lsSet("dnp-nick",inp.value.trim().slice(0,12));closeSheet(true);toast(T("닉네임을 저장했어요"));render()}},
+    h("label",{for:"set-nick"},T("닉네임"),h("small",{text:T("앞으로 쓰는 리뷰에 쓰입니다. 이미 쓴 리뷰는 리뷰 수정에서 바꿀 수 있어요.")}),inp),
+    h("button",{type:"submit",class:"btn wide",text:T("저장")})));
+}
+function areaSheet(){
+  var areas={};M().stores.forEach(function(s){if(s.area)areas[s.area]=1});
+  var inp=h("input",{type:"text",id:"set-area",list:"set-area-list",maxlength:"30",placeholder:T("예: 서울 마포구 망원동"),value:lsGet("dnp-area")});
+  openSheet(T("내 동네"),h("form",{onsubmit:function(e){
+    e.preventDefault();var v=inp.value.trim().replace(/\s+/g," ");
+    if(v&&areaTokens(v).length<2){toast(T("시·구까지 적어 주세요. 예: 서울 마포구 망원동"));return}
+    lsSet("dnp-area",v);closeSheet(true);toast(v?T("내 동네를 저장했어요"):T("내 동네를 지웠어요"));render();
+  }},h("label",{for:"set-area"},T("내 동네"),h("small",{text:T("시·구·동 순서로 적으면 가까운 곳부터 보여 드려요")}),inp),
+    h("datalist",{id:"set-area-list"},Object.keys(areas).sort().map(function(a){return h("option",{value:a})})),
+    h("button",{type:"submit",class:"btn wide",text:T("저장")})));
+}
+function clearSheet(){
+  var b=h("button",{type:"button",class:"btn wide danger",text:T("모두 지우기"),onclick:function(){
+    try{var ks=[];for(var i=0;i<localStorage.length;i++){var k=localStorage.key(i);if(k&&(k.indexOf("dnp-tr-")===0||k==="dnp-area"||k==="dnp-nick"))ks.push(k)}ks.forEach(function(k){localStorage.removeItem(k)})}catch(e){}
+    TRC={};TRFAIL={};closeSheet(true);toast(T("이 기기에 저장된 데이터를 지웠어요"));render();
+  }});
+  openSheet(T("기기에 저장된 데이터"),h("div",{style:"display:grid;gap:12px"},
+    h("p",{class:"lead",style:"margin:0",text:T("번역 기록, 내 동네, 닉네임은 이 기기에만 저장됩니다. 지워도 올린 가게와 리뷰는 그대로 남아요.")}),b));
+}
+function guideSheet(){
+  var items=[T("사장님은 가게를 직접 등록하고, 손님 리뷰에는 답글만 달 수 있습니다. 리뷰를 지울 수 없어요."),
+    T("리뷰는 쓴 사람만 고치거나 지울 수 있습니다."),
+    T("다른 언어로 쓴 글은 'Google 번역으로 보기' 버튼으로 번역해서 볼 수 있습니다."),
+    T("주변 탭은 GPS 대신 내 동네 주소로 가까운 곳을 찾습니다. 정식 앱에서는 현재 위치로 바뀝니다.")];
+  openSheet(T("이용 안내"),h("ul",{class:"guide"},items.map(function(t){return h("li",{text:t})})));
+}
+
+/* ---------- map and phone ---------- */
+function mapSheet(s){
+  var real=s.address&&s.address!=="예시 주소"?s.address:"";
+  var addr=real?s.area+" "+real:s.area,q=addr+" "+s.name;
+  var links=[["네이버 지도","https://map.naver.com/p/search/"+encodeURIComponent(q)],
+    ["카카오맵","https://map.kakao.com/?q="+encodeURIComponent(q)],
+    ["Google 지도","https://www.google.com/maps/search/?api=1&query="+encodeURIComponent(q)]];
+  openSheet(s.name,h("div",{style:"display:grid;gap:12px"},
+    h("div",{class:"addrbox"},h("b",{text:addr}),h("button",{type:"button",class:"btn small",onclick:function(){copyText(addr)}},icon("copy"),T("주소 복사"))),
+    h("div",{class:"optlist"},links.map(function(l){
+      return h("a",{class:"opt",href:l[1],target:"_blank",rel:"noopener"},icon("map"),h("div",{class:"grow"},h("b",{text:T(l[0])}),h("small",{text:T("지도 앱이나 새 창에서 열립니다")})),icon("chev"));
+    }))));
+}
+function phoneSheet(s){
+  if(!s.phone){toast(T("사장님이 전화번호를 등록하지 않았어요"));return}
+  var digits=s.phone.replace(/[^0-9+]/g,"");
+  openSheet(s.name,h("div",{style:"display:grid;gap:12px"},
+    h("p",{class:"bignum",text:s.phone}),
+    h("a",{class:"btn wide",href:"tel:"+digits},icon("phone"),T("전화 걸기")),
+    h("button",{type:"button",class:"btn wide ghost",onclick:function(){copyText(s.phone)}},icon("copy"),T("번호 복사")),
+    h("p",{class:"lead",style:"margin:0;text-align:center",text:T("전화 걸기가 안 되면 번호를 복사해서 걸어 주세요.")})));
+}
+
+var I18N={"en": {"방금": "just now", "분 전": " min ago", "시간 전": " h ago", "일 전": " d ago", "별점 ": "Rating ", "점": "★", "복사했어요": "Copied", "복사하지 못했어요. 길게 눌러 직접 복사해 주세요": "Couldn't copy. Press and hold to copy it yourself.", "원문 · 번역 보기": "Original · Show translation", "자동 번역됨 · 원문 보기": "Auto-translated · Show original", "자동 번역을 쓸 수 없어요 · 설정 보기": "Auto-translate unavailable · See settings", "번역 요청이 많아요 · 다시 시도": "Too many translation requests · Try again", "번역하지 못했어요 · 다시 시도": "Couldn't translate · Try again", "번역하는 중…": "Translating…", "밝게": "Light", "어둡게": "Dark", "기기 설정 따르기": "Same as device", "이 화면에서 Claude 번역이 허용되지 않았어요. 페이지를 새로 열면 다시 물어봅니다.": "Claude translation wasn't allowed on this screen. You'll be asked again when you reopen the page.", "번역 요청이 많아 잠시 멈췄어요. 리뷰 아래 '다시 시도'를 누르면 이어서 번역합니다.": "Translation paused because of too many requests. Tap 'Try again' under a review to continue.", "지금 보는 화면에서는 자동 번역을 쓸 수 없어요.": "Auto-translate isn't available on this screen.", "설정": "Settings", "프로필": "Profile", "익명 손님": "Anonymous guest", "리뷰에 보이는 닉네임": "Nickname shown on your reviews", "내 동네": "My area", "설정 안 함": "Not set", "주변 탭에서 가까운 곳을 찾을 때 씁니다": "Used to find places near you in the Nearby tab", "언어": "Language", "리뷰 자동 번역": "Auto-translate reviews", "다른 언어로 쓴 리뷰·답글·가게 소개를 내 언어로 바꿔 보여 줘요. 번역은 Claude가 합니다.": "Shows reviews, replies and shop descriptions written in other languages in your language. Translation is done by Claude.", "큰 글씨 모드": "Large text mode", "글씨와 버튼을 크게 보여 줘요": "Shows bigger text and buttons", "화면 테마": "Display theme", "기기에 저장된 데이터": "Data stored on this device", "개 번역": " translations", "번역 기록, 내 동네, 닉네임": "Translations, my area, nickname", "이용 안내": "How it works", "앱 정보": "About", "동네평 미리보기 1.0": "Dongnepyeong preview 1.0", "언어를 바꿨어요": "Language changed", "닉네임을 저장했어요": "Nickname saved", "닉네임": "Nickname", "앞으로 쓰는 리뷰에 쓰입니다. 이미 쓴 리뷰는 리뷰 수정에서 바꿀 수 있어요.": "Used for reviews you write from now on. You can change it on existing reviews by editing them.", "저장": "Save", "예: 서울 마포구 망원동": "e.g. 서울 마포구 망원동", "시·구까지 적어 주세요. 예: 서울 마포구 망원동": "Enter at least the city and district, e.g. 서울 마포구 망원동", "내 동네를 저장했어요": "My area saved", "내 동네를 지웠어요": "My area cleared", "시·구·동 순서로 적으면 가까운 곳부터 보여 드려요": "Enter city, district, neighborhood (Korean address order) to see the closest places first", "모두 지우기": "Clear all", "이 기기에 저장된 데이터를 지웠어요": "Data on this device cleared", "번역 기록, 내 동네, 닉네임은 이 기기에만 저장됩니다. 지워도 올린 가게와 리뷰는 그대로 남아요.": "Translations, your area and nickname are stored only on this device. Clearing them doesn't affect places or reviews you posted.", "사장님은 가게를 직접 등록하고, 손님 리뷰에는 답글만 달 수 있습니다. 리뷰를 지울 수 없어요.": "Owners list their own places and can only reply to reviews. They can't delete reviews.", "리뷰는 쓴 사람만 고치거나 지울 수 있습니다.": "Only the author can edit or delete a review.", "자동 번역은 Claude가 합니다. 처음 번역할 때 허용을 묻고, 번역에는 보는 사람의 Claude 사용량이 쓰입니다.": "Auto-translate is done by Claude. You're asked for permission the first time, and translations use the viewer's own Claude usage.", "주변 탭은 GPS 대신 내 동네 주소로 가까운 곳을 찾습니다. 정식 앱에서는 현재 위치로 바뀝니다.": "The Nearby tab uses your area instead of GPS. In the full app it will use your current location.", "주소 복사": "Copy address", "지도 앱이나 새 창에서 열립니다": "Opens in a map app or a new window", "사장님이 전화번호를 등록하지 않았어요": "The owner hasn't added a phone number", "전화 걸기": "Call", "번호 복사": "Copy number", "전화 걸기가 안 되면 번호를 복사해서 걸어 주세요.": "If calling doesn't work, copy the number and dial it yourself.", "참여 권한이 있어야 즐겨찾기를 할 수 있어요": "You need participant access to save places", "즐겨찾기에서 뺐습니다": "Removed from saved", "즐겨찾기에 담았습니다": "Saved", " 즐겨찾기 해제": " – remove from saved", " 즐겨찾기": " – save", "저장됨 ": "Saved ", "즐겨찾기 ": "Save ", "이 계정은 보기 전용이라 저장할 수 없습니다. 페이지 주인에게 참여 권한을 요청하세요.": "This account is view-only and can't save. Ask the page owner for participant access.", "저장 공간이 가득 찼습니다. 오래된 글이나 사진을 지운 뒤 다시 시도하세요.": "Storage is full. Delete old posts or photos and try again.", "요청이 너무 잦습니다. 잠시 뒤 다시 눌러 주세요.": "Too many requests. Please wait a moment and tap again.", "사진을 올리지 못했습니다. 다른 사진으로 다시 시도하세요.": "Couldn't upload the photo. Try a different photo.", "저장하지 못했습니다. 연결을 확인하고 다시 눌러 주세요.": "Couldn't save. Check your connection and tap again.", "저장소에 연결할 수 없어 가게와 리뷰를 불러오지 못했습니다. 로그인한 상태로 다시 열어 주세요.": "Can't connect to storage, so places and reviews couldn't load. Reopen the page while signed in.", "보기 전용으로 열려 있습니다. 가게 등록과 리뷰 작성은 참여 권한이 있어야 합니다.": "Opened as view-only. Listing places and writing reviews need participant access.", "뒤로": "Back", "예시": "Sample", "리뷰 ": "Reviews ", "새 가게": "New", "첫 리뷰를 기다려요": "Waiting for its first review", "한 번 더 누르면 삭제": "Tap again to delete", "삭제했습니다": "Deleted", "좋아요 취소": "Unlike", "좋아요": "Like", "개": "", "참여 권한이 있어야 좋아요를 누를 수 있어요": "You need participant access to like reviews", "좋아요 ": "Likes ", "사진 크게 보기": "View photo larger", "리뷰 사진": "Review photo", "닫기": "Close", " 리뷰 사진": " review photo", "홈 보기": "Home views", "주변": "Nearby", "트렌드": "Trending", "랭킹": "Ranking", "맛집, 핫플, 관광지 검색": "Search food, hot spots, sights", "검색어": "Search term", "동네평 홈": "Dongnepyeong home", "검색": "Search", "분류": "Categories", "트렌드 1위": "#1 trending", "요즘 뜨는 곳 ›": "What's hot now ›", "새로 문 연 곳": "Just opened", "첫 리뷰 남기기 ›": "Write the first review ›", "불러오는 중입니다…": "Loading…", "아직 리뷰가 없습니다. 다녀온 곳을 평가해 보세요.": "No reviews yet. Rate a place you've been to.", "리뷰 쓰기": "Write a review", "아직 등록된 가게가 없습니다.": "No places listed yet.", "에 등록된 가게가 없습니다.": ": no places listed yet.", "가게 등록하기": "List a place", "전체": "All", "랭킹 분류": "Ranking category", " 평점 랭킹": " rating ranking", " · 리뷰가 있는 곳만": " · places with reviews only", "아직 평가된 곳이 없습니다. 첫 리뷰를 남겨 보세요.": "No rated places yet. Leave the first review.", "요즘 뜨는 곳": "What's hot now", "최근 ": "Last ", "일 리뷰·즐겨찾기·좋아요가 많이 늘어난 순 · ": " days · most new reviews, saves and likes · ", "일 동안 새 리뷰나 즐겨찾기가 없습니다.": " days: no new reviews or saves.", " 사진": " photo", "새 리뷰 ": "New reviews ", "즐겨찾기 +": "Saves +", "좋아요 +": "Likes +", "내 동네를 ": "Your area is now ", "(으)로 정했어요": "", "이 동네로 보기": "Show this area", "이 화면에서는 휴대폰 GPS를 쓸 수 없어서, 내 동네 주소를 기준으로 가까운 곳을 찾습니다. 정식 앱에서는 현재 위치와 지도로 바뀝니다.": "GPS isn't available on this screen, so nearby places are found from your area's address. The full app will use your current location and a map.", "같은 동네 · ": "Same neighborhood · ", "같은 구 · ": "Same district · ", "같은 시·도 · ": "Same city · ", " 맛집": " 맛집", "지도": "Map", "변경": "Change", "곳": " places", " 근처에 등록된 곳이 아직 없습니다. 다른 동네로 바꾸거나 가게를 등록해 보세요.": ": nothing listed nearby yet. Try another area or list a place.", "모든 지역 ": "All regions ", "가게 ": "Places ", "지역 선택": "Choose region", "분류를 찾을 수 없습니다.": "Category not found.", "홈으로": "Go home", "전체 ": "All ", " 세부 분류": " subcategories", "정렬": "Sort", "평점순": "Top rated", "리뷰 많은 순": "Most reviewed", "신규": "Newest", "에 등록된 곳이 아직 없습니다.": ": nothing listed yet.", "가게, 메뉴, 동네 검색": "Search places, menus, areas", "가게 이름, 메뉴, 동네로 찾아보세요.": "Search by place name, menu or area.", "'에 맞는 가게가 없습니다.": "': no matching places.", "가게": "Place", "가게 정보를 불러오는 중입니다…": "Loading place…", "가게를 찾을 수 없습니다. 사장님이 삭제했을 수 있습니다.": "Place not found. The owner may have removed it.", "별점 분포": "Rating breakdown", "첫 리뷰": "First review", "대기 중": "pending", "영업시간": "Hours", "가격대": "Price", "대표 메뉴": "Signature menu", "눌러서 지도 앱 고르기": "Tap to choose a map app", "상세 주소 미등록 · 동네 기준으로 지도를 엽니다": "No street address · Map opens for the neighborhood", "전화": "Call", "아직 리뷰가 없습니다. 손님이 리뷰를 남기면 여기에 보입니다.": "No reviews yet. Customer reviews will appear here.", "아직 리뷰가 없습니다. 첫 의견을 남겨 주세요.": "No reviews yet. Be the first to share your thoughts.", "수정": "Edit", "답글 수정": "Edit reply", "답글 달기": "Reply", " · 수정됨": " · edited", "사장님 답글": "Owner's reply", "가게 정보 수정": "Edit place info", "참여 권한이 있어야 리뷰를 쓸 수 있어요": "You need participant access to write reviews", "내 리뷰 수정": "Edit my review", " 대표 사진": " main photo", "화면을 보여 주기 위한 예시 가게입니다. 실제 가게가 아닙니다.": "This is a sample place to show how the app looks. It isn't a real place.", "손님 사진": "Customer photos", "장": " photos", "손님 리뷰": "Customer reviews", "내 가게": "My places", "가게를 등록하면 손님 리뷰를 받고 답글을 달 수 있어요.": "List your place to receive reviews and reply to customers.", " · 리뷰 ": " · reviews ", "리뷰 없음": "No reviews", "삭제": "Delete", "가게 하나 더 등록": "List another place", "답글 기다리는 리뷰": "Reviews awaiting reply", "모든 리뷰에 답글을 달았어요.": "You've replied to every review.", "아직 받은 리뷰가 없습니다.": "No reviews received yet.", "답글": "Reply", "사장님 센터": "Owner center", "평균 별점": "Average rating", "답글 대기": "Awaiting reply", "올린 사진": "Photos posted", "사진 빼기": "Remove photo", "새 사진": "New photo", "사진 파일만 올릴 수 있어요": "Only image files can be uploaded", "20MB보다 큰 사진은 올릴 수 없어요": "Photos larger than 20MB can't be uploaded", "가게 등록": "List a place", "가게를 등록하려면 참여 권한이 있는 계정으로 로그인해야 합니다.": "Sign in with an account that has participant access to list a place.", "예: 망원 손칼국수": "e.g. 망원 손칼국수", "예: 포은로 00길 0, 1층": "e.g. 포은로 00길 0, 1층", "예: 11:00~21:00, 월 휴무": "e.g. 11:00–21:00, closed Mon", "예: 02-000-0000": "e.g. 02-000-0000", "예: 바지락칼국수, 손만두": "e.g. clam noodle soup, dumplings", "가게를 소개해 주세요. 주차, 예약, 포장 여부를 적어 두면 좋습니다.": "Introduce your place. Parking, reservations and takeout info are helpful.", "대표 사진 고르기": "Choose main photo", "수정 내용 저장": "Save changes", "가게 이름을 2자 이상 적어 주세요.": "Enter a place name of at least 2 characters.", "동네를 적어 주세요. 앞 단어(예: 서울)가 지역 필터에 쓰입니다.": "Enter the area. The first word (e.g. 서울) is used for the region filter.", "사진 올리는 중 ": "Uploading photos ", "저장하는 중…": "Saving…", "가게 정보를 저장했습니다": "Place info saved", "가게를 등록했습니다": "Place listed", "대표 사진 ": "Main photo ", "선택 · 가게 목록과 간판에 보입니다": "Optional · Shown in lists and on the signboard", "가게 이름": "Place name", "세부 업종": "Subcategory", "가격대 ": "Price ", "1인 기준": "per person", "동네": "Area", "상세 주소 ": "Street address ", "선택": "Optional", "영업시간 ": "Hours ", "전화 ": "Phone ", "대표 메뉴 ": "Signature menu ", "가게 소개 ": "About the place ", "사장님이 직접 가게를 올립니다. 등록하면 바로 홈에 보이고, 손님 리뷰에 답글을 달 수 있습니다. 리뷰를 지우는 기능은 없습니다.": "Owners list their own places. Listed places appear on the home screen right away, and you can reply to customer reviews. There is no way to delete reviews.", "즐겨찾기": "Saved", "저장한 곳": "Saved places", "곳 · 최근 저장한 순": " places · recently saved first", "가게 이름 옆 책갈피를 누르면 여기에 모입니다. 가고 싶은 맛집과 핫플을 저장해 두세요.": "Tap the bookmark next to a place to collect it here. Save food spots and hot spots you want to visit.", "둘러보기": "Browse", "내가 쓴 리뷰": "My reviews", "다녀온 가게에 첫 리뷰를 남겨 보세요.": "Leave your first review for a place you've visited.", "마이": "Me", "닉네임: ": "Nickname: ", "익명 손님 (리뷰를 쓸 때 정할 수 있어요)": "Anonymous guest (set it when you write a review)", "내 리뷰": "My reviews", "받은 좋아요": "Likes received", "불러오는 중입니다. 잠시 뒤 다시 눌러 주세요.": "Still loading. Please tap again in a moment.", "가게 이름이나 동네로 찾기": "Find by place name or area", "리뷰 쓸 가게 찾기": "Find a place to review", "찾는 가게가 없나요? 사장님이 아직 등록하지 않았을 수 있습니다.": "Can't find it? The owner may not have listed it yet.", "어느 가게 리뷰를 쓸까요?": "Which place are you reviewing?", "별점": "Rating", "별을 눌러 평가해 주세요": "Tap the stars to rate", "점 ": " stars, ", "리뷰 사진 고르기": "Choose review photos", "첫 줄은 피드 카드의 제목으로 보여요.\n맛, 가격, 서비스, 분위기… 느낀 그대로 자유롭게 적어 주세요.": "The first line becomes the title on the feed card.\nTaste, price, service, atmosphere… write freely about how it felt.", "수정 완료": "Save changes", "리뷰 올리기": "Post review", "별점을 선택해 주세요.": "Please choose a rating.", "의견을 5자 이상 적어 주세요.": "Write at least 5 characters.", "리뷰를 수정했습니다": "Review updated", "리뷰를 올렸습니다": "Review posted", "사진 ": "Photos ", "최대 3장 · 첫 장이 피드에 크게 보여요": "Up to 3 · the first one is shown large in the feed", "의견": "Your thoughts", "닉네임 ": "Nickname ", "비워 두면 익명 손님": "Leave empty to post as an anonymous guest", "내 리뷰 삭제": "Delete my review", " 리뷰 수정": ": edit review", " 리뷰 쓰기": ": write a review", "찾아 주신 손님께 감사 인사나 설명을 남겨 보세요.": "Leave a thank-you or an explanation for the customer.", "답글 저장": "Save reply", "답글 내용을 적어 주세요.": "Write your reply.", "답글을 저장했습니다": "Reply saved", "답글을 지웠습니다": "Reply deleted", "사장님 답글 ": "Owner's reply ", "모두 지우고 저장하면 답글이 삭제됩니다": "Clear everything and save to delete the reply", "저장소 응답이 늦어지고 있습니다. 연결되면 자동으로 채워집니다.": "Storage is slow to respond. The list will fill in once connected.", "보이는 내용이 최신이 아닐 수 있습니다.": "What you see may not be up to date.", "저장소 연결이 끊겼습니다. 보이는 내용이 최신이 아닐 수 있습니다.": "Lost connection to storage. What you see may not be up to date.", "맛집": "Food", "맛": "F", "한식": "Korean", "중식": "Chinese", "일식": "Japanese", "양식": "Western", "분식": "Street food", "치킨": "Chicken", "피자": "Pizza", "고기·구이": "BBQ & grill", "해산물": "Seafood", "아시안": "Asian", "패스트푸드": "Fast food", "카페·디저트": "Cafés & desserts", "커": "C", "카페": "Café", "베이커리": "Bakery", "디저트": "Desserts", "술집·바": "Bars", "술": "B", "호프·포차": "Pub & pocha", "이자카야": "Izakaya", "와인·칵테일바": "Wine & cocktail bar", "엔터테인먼트": "Entertainment", "놀": "E", "노래방": "Karaoke", "PC방": "PC café", "방탈출·보드게임": "Escape room & board games", "영화관": "Cinema", "공연·전시": "Shows & exhibitions", "볼링·당구": "Bowling & billiards", "키즈카페": "Kids café", "관광지": "Sights", "관": "S", "랜드마크": "Landmarks", "자연·공원": "Nature & parks", "박물관·미술관": "Museums & galleries", "전통시장·거리": "Markets & streets", "테마파크": "Theme parks", "핫플": "Hot spots", "핫": "H", "포토스팟": "Photo spots", "팝업스토어": "Pop-up stores", "루프탑·야경": "Rooftops & night views", "소품샵": "Gift shops", "뷰티·건강": "Beauty & health", "뷰": "Be", "미용실": "Hair salon", "네일": "Nails", "마사지·스파": "Massage & spa", "피부관리": "Skin care", "숙박": "Stays", "숙": "St", "호텔": "Hotel", "펜션·풀빌라": "Pension & pool villa", "게스트하우스": "Guesthouse", "쇼핑": "Shopping", "쇼": "Sh", "백화점·몰": "Department stores & malls", "옷가게": "Clothing", "편집숍": "Select shops", "생활": "Services", "생": "Li", "병원·약국": "Clinics & pharmacies", "세탁·수선": "Laundry & repairs", "기타": "Other", "1만원 이하": "Under ₩10,000", "1~2만원": "₩10,000–20,000", "2~4만원": "₩20,000–40,000", "4만원 이상": "Over ₩40,000", "해당 없음": "Not applicable", "별로예요": "Not good", "아쉬워요": "Could be better", "보통이에요": "Okay", "최고예요": "Excellent", "전국": "All Korea", "홈": "Home", "사장님": "Owner", "리뷰": "Review", "하단 메뉴": "Bottom menu", "좋았어요": "Good", "네이버 지도": "Naver Map", "카카오맵": "KakaoMap", "Google 지도": "Google Maps", "휴무일": "Closed on", "여러 개 고를 수 있어요": "Choose as many as apply", "월": "Mon", "화": "Tue", "수": "Wed", "목": "Thu", "금": "Fri", "토": "Sat", "일": "Sun", "공휴일": "Public holidays", "명절(설·추석)": "Lunar New Year & Chuseok", "부정기 휴무": "Irregular closures", "연중무휴": "Open every day", "오늘 휴무": "Closed today", "예: 11:00~21:00": "e.g. 11:00–21:00", "취소": "Cancel", "삭제하기": "Delete", "삭제하는 중…": "Deleting…", "삭제할까요?": "Delete this?", "삭제하면 되돌릴 수 없어요.": "This can't be undone.", "가게를 삭제할까요?": "Delete this place?", "가게 정보와 대표 사진이 지워집니다.": "The place info and main photo will be deleted.", "받은 리뷰 ": "Its ", "개도 앱에서 더 이상 보이지 않아요.": " reviews will no longer appear in the app.", "리뷰를 삭제할까요?": "Delete this review?", "리뷰와 올린 사진이 지워집니다.": "The review and its photos will be deleted.", "기": "Ot", "전": "All", "클럽": "Club", "성인 전용": "Adults only", "썸네일 사진": "Thumbnail", "썸네일 사진 고르기": "Choose thumbnail", "1장 · 홈 화면과 가게 목록에 보여요": "1 photo · shown on the home screen and in lists", "가게 사진": "Place photos", "가게 사진 고르기": "Choose place photos", "최대 10장 · 가게 화면 맨 위에서 옆으로 넘겨 봅니다": "Up to 10 · swipe through them at the top of the place page", "가게 정보와 가게 사진이 지워집니다.": "The place info and its photos will be deleted.", "사진": "Photo", "이전 사진": "Previous photo", "다음 사진": "Next photo", "청소년 출입금지": "No under-18s", "성인만 출입할 수 있는 곳이면 체크하세요. 홈 화면과 가게 화면에 청소년 출입금지 표시가 붙습니다. 나이 표시는 보는 사람의 언어에 맞춰 바뀌어요.": "Check this if only adults may enter. An age-limit label appears on the home screen and the place page, with the age shown by the viewer's language.", "24시간 영업": "Open 24 hours", "다음날 ": "next day ", "시간 정하기": "Set hours", "입력 안 함": "Don't specify", "여는 시각": "Opens", "닫는 시각": "Closes", "여는 시각과 닫는 시각이 같아요. 24시간 영업이면 위에서 '24시간 영업'을 골라 주세요.": "Opening and closing times are the same. If you're open around the clock, choose 'Open 24 hours' above.", "닫는 시각이 여는 시각보다 이르면 다음날 새벽까지 영업으로 표시돼요.": "If closing is earlier than opening, it shows as open until the next morning.", "앞자리": "Prefix", "나머지 번호": "Rest of the number", "휴대폰": "Mobile", "서울": "Seoul", "경기": "Gyeonggi", "인천": "Incheon", "강원": "Gangwon", "충남": "S. Chungcheong", "대전": "Daejeon", "충북": "N. Chungcheong", "세종": "Sejong", "부산": "Busan", "울산": "Ulsan", "대구": "Daegu", "경북": "N. Gyeongsang", "경남": "S. Gyeongsang", "전남": "S. Jeolla", "광주": "Gwangju", "전북": "N. Jeolla", "제주": "Jeju", "인터넷 전화": "Internet phone", "대표번호 (1588 등)": "Business number (1588 etc.)", "대표번호는 8자리로 적어 주세요. 예: 1588-1234": "Business numbers have 8 digits, e.g. 1588-1234", "전화번호 뒷자리를 7~8자리로 적어 주세요.": "Enter the remaining 7–8 digits of the phone number.", "같은 동네, 같은 주소에 이미 등록된 가게가 있어요": "A place is already listed at this area and address", "같은 가게는 한 번만 등록할 수 있어요.": "Each place can only be listed once.", "상세 주소를 입력하면 손님이 찾기 더 편해져요!": "Adding the street address makes it easier for customers to find you!", "선택 · 앞자리를 고르고 나머지 번호를 적어 주세요": "Optional · choose the prefix and type the rest", "firebase-config.js 파일에 Firebase 설정값을 넣어 주세요. (README의 2단계)": "Add your Firebase settings to firebase-config.js (README step 2).", "가게를 등록하려면 로그인해 주세요.": "Sign in to list a place.", "계정": "Account", "계정이 없나요? 이메일로 가입": "No account? Sign up with email", "구글": "Google", "구글·이메일·카카오·네이버로 로그인": "Sign in with Google, email, Kakao or Naver", "구글로 계속하기": "Continue with Google", "네이버": "Naver", "네이버 로그인이 아직 설정되지 않았어요.": "Naver sign-in isn't set up yet.", "네이버로 계속하기": "Continue with Naver", "또는 이메일로": "or with email", "로그아웃": "Sign out", "로그아웃하려면 누르세요": "Tap to sign out", "로그아웃했어요": "Signed out", "로그인": "Sign in", "로그인 안 함": "Not signed in", "로그인이 필요해요. 로그인한 뒤 다시 눌러 주세요.": "You need to sign in. Sign in and tap again.", "로그인하고 동네평을 시작하세요": "Sign in to get started", "로그인하고 리뷰 쓰기": "Sign in to write a review", "로그인하기": "Sign in", "로그인하면 가고 싶은 곳을 저장할 수 있어요.": "Sign in to save places you want to visit.", "로그인하면 리뷰를 쓸 수 있어요.": "Sign in to write a review.", "로그인하면 좋아요를 누를 수 있어요.": "Sign in to like reviews.", "로그인하지 못했어요. 다시 시도해 주세요.": "Couldn't sign in. Please try again.", "로그인했어요": "Signed in", "리뷰 쓰기, 가게 저장, 좋아요, 가게 등록은 로그인 후에 할 수 있어요.": "Writing reviews, saving places, likes and listing a place need you to sign in.", "비밀번호": "Password", "비밀번호 6자 이상": "At least 6 characters", "비밀번호 재설정 메일을 보냈어요.": "Password reset email sent.", "비밀번호는 6자 이상이어야 해요.": "Password must be at least 6 characters.", "비밀번호를 잊었나요?": "Forgot password?", "비밀번호를 재설정할 이메일을 먼저 적어 주세요.": "Enter your email first to reset the password.", "서버 연결이 끊겼습니다. 보이는 내용이 최신이 아닐 수 있습니다.": "Lost connection to the server. What you see may not be up to date.", "서버 응답이 늦어지고 있습니다. 연결되면 자동으로 채워집니다.": "The server is slow to respond. The list will fill in once connected.", "서버에 연결되지 않았어요. 잠시 뒤 다시 시도해 주세요.": "Not connected to the server. Try again in a moment.", "서버에 연결할 수 없어 가게와 리뷰를 불러오지 못했습니다. 인터넷 연결을 확인해 주세요.": "Couldn't reach the server to load places and reviews. Check your internet connection.", "시도가 너무 많아요. 잠시 뒤 다시 해 주세요.": "Too many attempts. Please try again later.", "오늘 번역 한도를 넘었거나 요청이 많아 잠시 멈췄어요. 리뷰 아래 '다시 시도'를 누르면 이어서 번역합니다.": "Translation paused: today's limit was reached or there were too many requests. Tap 'Try again' under a review to continue.", "이 로그인 방식이 아직 켜져 있지 않아요. Firebase 콘솔에서 켜 주세요.": "This sign-in method isn't enabled yet. Turn it on in the Firebase console.", "이 주소에서는 로그인할 수 없어요. Firebase 콘솔의 승인된 도메인에 추가해 주세요.": "Sign-in isn't allowed on this address. Add it to Authorized domains in the Firebase console.", "이메일": "Email", "이메일 또는 비밀번호가 맞지 않아요.": "Email or password is incorrect.", "이메일 주소를 확인해 주세요.": "Check the email address.", "이메일로 가입하기": "Sign up with email", "이메일로 로그인": "Sign in with email", "이미 가입된 이메일이에요. 로그인해 주세요.": "This email is already registered. Please sign in.", "이미 계정이 있나요? 로그인": "Have an account? Sign in", "자동 번역 서버가 아직 준비되지 않았어요. 관리자가 번역 키를 설정하면 바로 쓸 수 있어요.": "The translation server isn't ready yet. It will work once the admin sets the translation key.", "자동 번역은 Claude가 합니다. 한 번 번역한 글은 서버에 저장해 다시 번역하지 않습니다.": "Auto-translate is done by Claude. Each translation is saved on the server and reused.", "저장할 권한이 없어요. 다시 로그인해 주세요.": "You don't have permission to save. Please sign in again.", "저장할 수 없어요. 같은 주소에 이미 등록된 가게가 있거나, 내 가게가 아니에요.": "Couldn't save. A place is already listed at this address, or this isn't your place.", "카카오": "Kakao", "카카오 로그인이 아직 설정되지 않았어요.": "Kakao sign-in isn't set up yet.", "카카오로 계속하기": "Continue with Kakao", "구글 또는 이메일로 로그인": "Sign in with Google or email", "Google 번역으로 보기": "View in Google Translate", "번역 버튼 보이기": "Show translate button", "다른 언어로 쓴 리뷰·답글·가게 소개 아래에 'Google 번역으로 보기' 버튼을 보여 줘요.": "Shows a 'View in Google Translate' button under reviews, replies and descriptions written in other languages.", "다른 언어로 쓴 글은 'Google 번역으로 보기' 버튼으로 번역해서 볼 수 있습니다.": "Text written in other languages can be read with the 'View in Google Translate' button.", "내 동네, 닉네임": "My area, nickname"}, "ja": {"방금": "たった今", "분 전": "分前", "시간 전": "時間前", "일 전": "日前", "별점 ": "評価 ", "점": "点", "복사했어요": "コピーしました", "복사하지 못했어요. 길게 눌러 직접 복사해 주세요": "コピーできませんでした。長押ししてコピーしてください。", "원문 · 번역 보기": "原文 · 翻訳を表示", "자동 번역됨 · 원문 보기": "自動翻訳 · 原文を表示", "자동 번역을 쓸 수 없어요 · 설정 보기": "自動翻訳を使えません · 設定を見る", "번역 요청이 많아요 · 다시 시도": "翻訳リクエストが多すぎます · 再試行", "번역하지 못했어요 · 다시 시도": "翻訳できませんでした · 再試行", "번역하는 중…": "翻訳中…", "밝게": "ライト", "어둡게": "ダーク", "기기 설정 따르기": "端末の設定に合わせる", "이 화면에서 Claude 번역이 허용되지 않았어요. 페이지를 새로 열면 다시 물어봅니다.": "この画面ではClaudeによる翻訳が許可されていません。ページを開き直すと再度確認します。", "번역 요청이 많아 잠시 멈췄어요. 리뷰 아래 '다시 시도'를 누르면 이어서 번역합니다.": "リクエストが多いため翻訳を一時停止しました。口コミの下の「再試行」を押すと続けます。", "지금 보는 화면에서는 자동 번역을 쓸 수 없어요.": "この画面では自動翻訳を使えません。", "설정": "設定", "프로필": "プロフィール", "익명 손님": "匿名ゲスト", "리뷰에 보이는 닉네임": "口コミに表示されるニックネーム", "내 동네": "マイエリア", "설정 안 함": "未設定", "주변 탭에서 가까운 곳을 찾을 때 씁니다": "「周辺」タブで近くの場所を探すときに使います", "언어": "言語", "리뷰 자동 번역": "口コミの自動翻訳", "다른 언어로 쓴 리뷰·답글·가게 소개를 내 언어로 바꿔 보여 줘요. 번역은 Claude가 합니다.": "他の言語で書かれた口コミ・返信・お店の紹介をあなたの言語で表示します。翻訳はClaudeが行います。", "큰 글씨 모드": "大きな文字モード", "글씨와 버튼을 크게 보여 줘요": "文字とボタンを大きく表示します", "화면 테마": "画面テーマ", "기기에 저장된 데이터": "この端末に保存されたデータ", "개 번역": "件の翻訳", "번역 기록, 내 동네, 닉네임": "翻訳履歴、マイエリア、ニックネーム", "이용 안내": "ご利用案内", "앱 정보": "アプリ情報", "동네평 미리보기 1.0": "동네평 プレビュー 1.0", "언어를 바꿨어요": "言語を変更しました", "닉네임을 저장했어요": "ニックネームを保存しました", "닉네임": "ニックネーム", "앞으로 쓰는 리뷰에 쓰입니다. 이미 쓴 리뷰는 리뷰 수정에서 바꿀 수 있어요.": "これから書く口コミに使われます。書いた口コミは編集で変更できます。", "저장": "保存", "예: 서울 마포구 망원동": "例: 서울 마포구 망원동", "시·구까지 적어 주세요. 예: 서울 마포구 망원동": "市・区まで入力してください。例: 서울 마포구 망원동", "내 동네를 저장했어요": "マイエリアを保存しました", "내 동네를 지웠어요": "マイエリアを削除しました", "시·구·동 순서로 적으면 가까운 곳부터 보여 드려요": "市・区・洞の順に入力すると近い場所から表示します", "모두 지우기": "すべて削除", "이 기기에 저장된 데이터를 지웠어요": "この端末のデータを削除しました", "번역 기록, 내 동네, 닉네임은 이 기기에만 저장됩니다. 지워도 올린 가게와 리뷰는 그대로 남아요.": "翻訳履歴、マイエリア、ニックネームはこの端末にのみ保存されます。削除しても投稿したお店や口コミは残ります。", "사장님은 가게를 직접 등록하고, 손님 리뷰에는 답글만 달 수 있습니다. 리뷰를 지울 수 없어요.": "店主はお店を自分で登録し、口コミには返信だけできます。口コミは削除できません。", "리뷰는 쓴 사람만 고치거나 지울 수 있습니다.": "口コミは書いた本人だけが編集・削除できます。", "자동 번역은 Claude가 합니다. 처음 번역할 때 허용을 묻고, 번역에는 보는 사람의 Claude 사용량이 쓰입니다.": "自動翻訳はClaudeが行います。最初の翻訳時に許可を求め、閲覧者のClaude利用枠を使います。", "주변 탭은 GPS 대신 내 동네 주소로 가까운 곳을 찾습니다. 정식 앱에서는 현재 위치로 바뀝니다.": "「周辺」タブはGPSの代わりにマイエリアで近い場所を探します。正式版では現在地を使います。", "주소 복사": "住所をコピー", "지도 앱이나 새 창에서 열립니다": "地図アプリまたは新しいウィンドウで開きます", "사장님이 전화번호를 등록하지 않았어요": "店主が電話番号を登録していません", "전화 걸기": "電話をかける", "번호 복사": "番号をコピー", "전화 걸기가 안 되면 번호를 복사해서 걸어 주세요.": "電話がかからない場合は、番号をコピーしてかけてください。", "참여 권한이 있어야 즐겨찾기를 할 수 있어요": "保存するには参加権限が必要です", "즐겨찾기에서 뺐습니다": "保存から外しました", "즐겨찾기에 담았습니다": "保存しました", " 즐겨찾기 해제": " の保存を解除", " 즐겨찾기": " を保存", "저장됨 ": "保存済み ", "즐겨찾기 ": "保存 ", "이 계정은 보기 전용이라 저장할 수 없습니다. 페이지 주인에게 참여 권한을 요청하세요.": "このアカウントは閲覧専用のため保存できません。ページの所有者に参加権限を依頼してください。", "저장 공간이 가득 찼습니다. 오래된 글이나 사진을 지운 뒤 다시 시도하세요.": "保存容量がいっぱいです。古い投稿や写真を削除してから再試行してください。", "요청이 너무 잦습니다. 잠시 뒤 다시 눌러 주세요.": "リクエストが多すぎます。少し待ってからもう一度押してください。", "사진을 올리지 못했습니다. 다른 사진으로 다시 시도하세요.": "写真をアップロードできませんでした。別の写真で試してください。", "저장하지 못했습니다. 연결을 확인하고 다시 눌러 주세요.": "保存できませんでした。接続を確認してもう一度押してください。", "저장소에 연결할 수 없어 가게와 리뷰를 불러오지 못했습니다. 로그인한 상태로 다시 열어 주세요.": "ストレージに接続できず、お店と口コミを読み込めませんでした。ログインした状態で開き直してください。", "보기 전용으로 열려 있습니다. 가게 등록과 리뷰 작성은 참여 권한이 있어야 합니다.": "閲覧専用で開いています。お店の登録や口コミの投稿には参加権限が必要です。", "뒤로": "戻る", "예시": "サンプル", "리뷰 ": "口コミ ", "새 가게": "新着", "첫 리뷰를 기다려요": "最初の口コミを待っています", "한 번 더 누르면 삭제": "もう一度押すと削除", "삭제했습니다": "削除しました", "좋아요 취소": "いいねを取り消す", "좋아요": "いいね", "개": "件", "참여 권한이 있어야 좋아요를 누를 수 있어요": "いいねするには参加権限が必要です", "좋아요 ": "いいね ", "사진 크게 보기": "写真を拡大", "리뷰 사진": "口コミ写真", "닫기": "閉じる", " 리뷰 사진": " の口コミ写真", "홈 보기": "ホーム表示", "주변": "周辺", "트렌드": "トレンド", "랭킹": "ランキング", "맛집, 핫플, 관광지 검색": "グルメ・話題スポット・観光地を検索", "검색어": "検索語", "동네평 홈": "동네평 ホーム", "검색": "検索", "분류": "分類", "트렌드 1위": "トレンド1位", "요즘 뜨는 곳 ›": "今話題の場所 ›", "새로 문 연 곳": "新しくオープン", "첫 리뷰 남기기 ›": "最初の口コミを書く ›", "불러오는 중입니다…": "読み込み中…", "아직 리뷰가 없습니다. 다녀온 곳을 평가해 보세요.": "まだ口コミがありません。行った場所を評価しましょう。", "리뷰 쓰기": "口コミを書く", "아직 등록된 가게가 없습니다.": "まだお店が登録されていません。", "에 등록된 가게가 없습니다.": "にはまだお店がありません。", "가게 등록하기": "お店を登録する", "전체": "すべて", "랭킹 분류": "ランキングの分類", " 평점 랭킹": " 評価ランキング", " · 리뷰가 있는 곳만": " · 口コミのある場所のみ", "아직 평가된 곳이 없습니다. 첫 리뷰를 남겨 보세요.": "まだ評価された場所がありません。最初の口コミを書きましょう。", "요즘 뜨는 곳": "今話題の場所", "최근 ": "最近", "일 리뷰·즐겨찾기·좋아요가 많이 늘어난 순 · ": "日間で口コミ・保存・いいねが増えた順 · ", "일 동안 새 리뷰나 즐겨찾기가 없습니다.": "日間、新しい口コミや保存はありません。", " 사진": " の写真", "새 리뷰 ": "新着口コミ ", "즐겨찾기 +": "保存 +", "좋아요 +": "いいね +", "내 동네를 ": "マイエリアを ", "(으)로 정했어요": "に設定しました", "이 동네로 보기": "このエリアで見る", "이 화면에서는 휴대폰 GPS를 쓸 수 없어서, 내 동네 주소를 기준으로 가까운 곳을 찾습니다. 정식 앱에서는 현재 위치와 지도로 바뀝니다.": "この画面ではスマホのGPSを使えないため、マイエリアの住所をもとに近い場所を探します。正式版では現在地と地図に変わります。", "같은 동네 · ": "同じ町 · ", "같은 구 · ": "同じ区 · ", "같은 시·도 · ": "同じ市・道 · ", " 맛집": " 맛집", "지도": "地図", "변경": "変更", "곳": "件", " 근처에 등록된 곳이 아직 없습니다. 다른 동네로 바꾸거나 가게를 등록해 보세요.": " 周辺にはまだ登録がありません。別のエリアにするか、お店を登録してください。", "모든 지역 ": "全地域 ", "가게 ": "お店 ", "지역 선택": "地域を選択", "분류를 찾을 수 없습니다.": "分類が見つかりません。", "홈으로": "ホームへ", "전체 ": "すべて ", " 세부 분류": " の詳細分類", "정렬": "並び替え", "평점순": "評価順", "리뷰 많은 순": "口コミが多い順", "신규": "新着", "에 등록된 곳이 아직 없습니다.": "にはまだ登録がありません。", "가게, 메뉴, 동네 검색": "お店・メニュー・エリアを検索", "가게 이름, 메뉴, 동네로 찾아보세요.": "お店の名前、メニュー、エリアで探せます。", "'에 맞는 가게가 없습니다.": "' に一致するお店はありません。", "가게": "お店", "가게 정보를 불러오는 중입니다…": "お店の情報を読み込み中…", "가게를 찾을 수 없습니다. 사장님이 삭제했을 수 있습니다.": "お店が見つかりません。店主が削除した可能性があります。", "별점 분포": "評価の分布", "첫 리뷰": "最初の口コミ", "대기 중": "待ち", "영업시간": "営業時間", "가격대": "価格帯", "대표 메뉴": "看板メニュー", "눌러서 지도 앱 고르기": "タップして地図アプリを選択", "상세 주소 미등록 · 동네 기준으로 지도를 엽니다": "詳細住所未登録 · エリアで地図を開きます", "전화": "電話", "아직 리뷰가 없습니다. 손님이 리뷰를 남기면 여기에 보입니다.": "まだ口コミがありません。お客様の口コミはここに表示されます。", "아직 리뷰가 없습니다. 첫 의견을 남겨 주세요.": "まだ口コミがありません。最初の感想を書いてください。", "수정": "編集", "답글 수정": "返信を編集", "답글 달기": "返信する", " · 수정됨": " · 編集済み", "사장님 답글": "店主の返信", "가게 정보 수정": "お店の情報を編集", "참여 권한이 있어야 리뷰를 쓸 수 있어요": "口コミを書くには参加権限が必要です", "내 리뷰 수정": "自分の口コミを編集", " 대표 사진": " のメイン写真", "화면을 보여 주기 위한 예시 가게입니다. 실제 가게가 아닙니다.": "画面を見せるためのサンプルです。実在のお店ではありません。", "손님 사진": "お客様の写真", "장": "枚", "손님 리뷰": "お客様の口コミ", "내 가게": "自分のお店", "가게를 등록하면 손님 리뷰를 받고 답글을 달 수 있어요.": "お店を登録すると口コミを受け取り、返信できます。", " · 리뷰 ": " · 口コミ ", "리뷰 없음": "口コミなし", "삭제": "削除", "가게 하나 더 등록": "お店をもう1つ登録", "답글 기다리는 리뷰": "返信待ちの口コミ", "모든 리뷰에 답글을 달았어요.": "すべての口コミに返信しました。", "아직 받은 리뷰가 없습니다.": "まだ口コミがありません。", "답글": "返信", "사장님 센터": "店主センター", "평균 별점": "平均評価", "답글 대기": "返信待ち", "올린 사진": "投稿した写真", "사진 빼기": "写真を外す", "새 사진": "新しい写真", "사진 파일만 올릴 수 있어요": "画像ファイルのみアップロードできます", "20MB보다 큰 사진은 올릴 수 없어요": "20MBを超える写真はアップロードできません", "가게 등록": "お店の登録", "가게를 등록하려면 참여 권한이 있는 계정으로 로그인해야 합니다.": "お店を登録するには参加権限のあるアカウントでログインしてください。", "예: 망원 손칼국수": "例: 망원 손칼국수", "예: 포은로 00길 0, 1층": "例: 포은로 00길 0, 1층", "예: 11:00~21:00, 월 휴무": "例: 11:00〜21:00、月曜定休", "예: 02-000-0000": "例: 02-000-0000", "예: 바지락칼국수, 손만두": "例: アサリカルグクス、手作り餃子", "가게를 소개해 주세요. 주차, 예약, 포장 여부를 적어 두면 좋습니다.": "お店を紹介してください。駐車場、予約、テイクアウトの可否を書くと便利です。", "대표 사진 고르기": "メイン写真を選ぶ", "수정 내용 저장": "変更を保存", "가게 이름을 2자 이상 적어 주세요.": "お店の名前を2文字以上入力してください。", "동네를 적어 주세요. 앞 단어(예: 서울)가 지역 필터에 쓰입니다.": "エリアを入力してください。最初の単語（例: 서울）が地域フィルターに使われます。", "사진 올리는 중 ": "写真をアップロード中 ", "저장하는 중…": "保存中…", "가게 정보를 저장했습니다": "お店の情報を保存しました", "가게를 등록했습니다": "お店を登録しました", "대표 사진 ": "メイン写真 ", "선택 · 가게 목록과 간판에 보입니다": "任意 · 一覧と看板に表示されます", "가게 이름": "お店の名前", "세부 업종": "詳細業種", "가격대 ": "価格帯 ", "1인 기준": "1人あたり", "동네": "エリア", "상세 주소 ": "詳細住所 ", "선택": "任意", "영업시간 ": "営業時間 ", "전화 ": "電話 ", "대표 메뉴 ": "看板メニュー ", "가게 소개 ": "お店の紹介 ", "사장님이 직접 가게를 올립니다. 등록하면 바로 홈에 보이고, 손님 리뷰에 답글을 달 수 있습니다. 리뷰를 지우는 기능은 없습니다.": "店主がお店を自分で登録します。登録するとすぐホームに表示され、口コミに返信できます。口コミを削除する機能はありません。", "즐겨찾기": "保存済み", "저장한 곳": "保存した場所", "곳 · 최근 저장한 순": "件 · 最近保存した順", "가게 이름 옆 책갈피를 누르면 여기에 모입니다. 가고 싶은 맛집과 핫플을 저장해 두세요.": "お店の横のしおりを押すとここに集まります。行きたいグルメや話題スポットを保存しましょう。", "둘러보기": "見て回る", "내가 쓴 리뷰": "自分の口コミ", "다녀온 가게에 첫 리뷰를 남겨 보세요.": "行ったお店に最初の口コミを書きましょう。", "마이": "マイ", "닉네임: ": "ニックネーム: ", "익명 손님 (리뷰를 쓸 때 정할 수 있어요)": "匿名ゲスト（口コミを書くときに設定できます）", "내 리뷰": "自分の口コミ", "받은 좋아요": "もらったいいね", "불러오는 중입니다. 잠시 뒤 다시 눌러 주세요.": "読み込み中です。少し待ってからもう一度押してください。", "가게 이름이나 동네로 찾기": "お店の名前やエリアで探す", "리뷰 쓸 가게 찾기": "口コミを書くお店を探す", "찾는 가게가 없나요? 사장님이 아직 등록하지 않았을 수 있습니다.": "見つかりませんか？店主がまだ登録していない可能性があります。", "어느 가게 리뷰를 쓸까요?": "どのお店の口コミを書きますか？", "별점": "評価", "별을 눌러 평가해 주세요": "星をタップして評価してください", "점 ": "点 ", "리뷰 사진 고르기": "口コミ写真を選ぶ", "첫 줄은 피드 카드의 제목으로 보여요.\n맛, 가격, 서비스, 분위기… 느낀 그대로 자유롭게 적어 주세요.": "1行目はフィードカードのタイトルになります。\n味、価格、サービス、雰囲気…感じたことを自由に書いてください。", "수정 완료": "編集を完了", "리뷰 올리기": "口コミを投稿", "별점을 선택해 주세요.": "評価を選んでください。", "의견을 5자 이상 적어 주세요.": "5文字以上書いてください。", "리뷰를 수정했습니다": "口コミを編集しました", "리뷰를 올렸습니다": "口コミを投稿しました", "사진 ": "写真 ", "최대 3장 · 첫 장이 피드에 크게 보여요": "最大3枚 · 1枚目がフィードに大きく表示されます", "의견": "感想", "닉네임 ": "ニックネーム ", "비워 두면 익명 손님": "空欄なら匿名ゲストになります", "내 리뷰 삭제": "自分の口コミを削除", " 리뷰 수정": " の口コミを編集", " 리뷰 쓰기": " の口コミを書く", "찾아 주신 손님께 감사 인사나 설명을 남겨 보세요.": "来店したお客様へのお礼や説明を書きましょう。", "답글 저장": "返信を保存", "답글 내용을 적어 주세요.": "返信内容を入力してください。", "답글을 저장했습니다": "返信を保存しました", "답글을 지웠습니다": "返信を削除しました", "사장님 답글 ": "店主の返信 ", "모두 지우고 저장하면 답글이 삭제됩니다": "すべて消して保存すると返信が削除されます", "저장소 응답이 늦어지고 있습니다. 연결되면 자동으로 채워집니다.": "ストレージの応答が遅れています。接続されると自動で表示されます。", "보이는 내용이 최신이 아닐 수 있습니다.": "表示内容が最新ではない可能性があります。", "저장소 연결이 끊겼습니다. 보이는 내용이 최신이 아닐 수 있습니다.": "ストレージとの接続が切れました。表示内容が最新ではない可能性があります。", "맛집": "グルメ", "맛": "食", "한식": "韓国料理", "중식": "中華", "일식": "和食", "양식": "洋食", "분식": "粉食（軽食）", "치킨": "チキン", "피자": "ピザ", "고기·구이": "焼肉・グリル", "해산물": "海鮮", "아시안": "アジア料理", "패스트푸드": "ファストフード", "카페·디저트": "カフェ・スイーツ", "커": "茶", "카페": "カフェ", "베이커리": "ベーカリー", "디저트": "スイーツ", "술집·바": "居酒屋・バー", "술": "酒", "호프·포차": "ビアホール・屋台", "이자카야": "居酒屋", "와인·칵테일바": "ワイン・カクテルバー", "엔터테인먼트": "エンタメ", "놀": "遊", "노래방": "カラオケ", "PC방": "PCバン", "방탈출·보드게임": "脱出ゲーム・ボードゲーム", "영화관": "映画館", "공연·전시": "公演・展示", "볼링·당구": "ボウリング・ビリヤード", "키즈카페": "キッズカフェ", "관광지": "観光地", "관": "観", "랜드마크": "ランドマーク", "자연·공원": "自然・公園", "박물관·미술관": "博物館・美術館", "전통시장·거리": "伝統市場・通り", "테마파크": "テーマパーク", "핫플": "話題スポット", "핫": "熱", "포토스팟": "フォトスポット", "팝업스토어": "ポップアップストア", "루프탑·야경": "ルーフトップ・夜景", "소품샵": "雑貨店", "뷰티·건강": "美容・健康", "뷰": "美", "미용실": "美容室", "네일": "ネイル", "마사지·스파": "マッサージ・スパ", "피부관리": "エステ", "숙박": "宿泊", "숙": "宿", "호텔": "ホテル", "펜션·풀빌라": "ペンション・プールヴィラ", "게스트하우스": "ゲストハウス", "쇼핑": "ショッピング", "쇼": "買", "백화점·몰": "百貨店・モール", "옷가게": "洋服店", "편집숍": "セレクトショップ", "생활": "生活", "생": "生", "병원·약국": "病院・薬局", "세탁·수선": "クリーニング・修理", "기타": "その他", "1만원 이하": "1万ウォン以下", "1~2만원": "1〜2万ウォン", "2~4만원": "2〜4万ウォン", "4만원 이상": "4万ウォン以上", "해당 없음": "該当なし", "별로예요": "いまいち", "아쉬워요": "もう少し", "보통이에요": "ふつう", "최고예요": "最高", "전국": "全国", "홈": "ホーム", "사장님": "店主", "리뷰": "口コミ", "하단 메뉴": "下部メニュー", "좋았어요": "よかった", "네이버 지도": "NAVER地図", "카카오맵": "カカオマップ", "Google 지도": "Googleマップ", "휴무일": "定休日", "여러 개 고를 수 있어요": "複数選択できます", "월": "月", "화": "火", "수": "水", "목": "木", "금": "金", "토": "土", "일": "日", "공휴일": "祝日", "명절(설·추석)": "旧正月・秋夕", "부정기 휴무": "不定休", "연중무휴": "年中無休", "오늘 휴무": "本日定休", "예: 11:00~21:00": "例: 11:00〜21:00", "취소": "キャンセル", "삭제하기": "削除する", "삭제하는 중…": "削除中…", "삭제할까요?": "削除しますか？", "삭제하면 되돌릴 수 없어요.": "削除すると元に戻せません。", "가게를 삭제할까요?": "お店を削除しますか？", "가게 정보와 대표 사진이 지워집니다.": "お店の情報とメイン写真が削除されます。", "받은 리뷰 ": "受け取った口コミ ", "개도 앱에서 더 이상 보이지 않아요.": "件もアプリに表示されなくなります。", "리뷰를 삭제할까요?": "口コミを削除しますか？", "리뷰와 올린 사진이 지워집니다.": "口コミと写真が削除されます。", "기": "他", "전": "全", "클럽": "クラブ", "성인 전용": "成人専用", "썸네일 사진": "サムネイル写真", "썸네일 사진 고르기": "サムネイル写真を選ぶ", "1장 · 홈 화면과 가게 목록에 보여요": "1枚 · ホーム画面とお店一覧に表示されます", "가게 사진": "お店の写真", "가게 사진 고르기": "お店の写真を選ぶ", "최대 10장 · 가게 화면 맨 위에서 옆으로 넘겨 봅니다": "最大10枚 · お店の画面の一番上で横にスワイプして見られます", "가게 정보와 가게 사진이 지워집니다.": "お店の情報と写真が削除されます。", "사진": "写真", "이전 사진": "前の写真", "다음 사진": "次の写真", "청소년 출입금지": "20歳未満入店禁止", "성인만 출입할 수 있는 곳이면 체크하세요. 홈 화면과 가게 화면에 청소년 출입금지 표시가 붙습니다. 나이 표시는 보는 사람의 언어에 맞춰 바뀌어요.": "成人のみ入店できる場所ならチェックしてください。ホーム画面とお店の画面に年齢制限の表示が付き、年齢は閲覧者の言語に合わせて表示されます。", "24시간 영업": "24時間営業", "다음날 ": "翌", "시간 정하기": "時間を設定", "입력 안 함": "入力しない", "여는 시각": "開店", "닫는 시각": "閉店", "여는 시각과 닫는 시각이 같아요. 24시간 영업이면 위에서 '24시간 영업'을 골라 주세요.": "開店と閉店が同じ時刻です。24時間営業なら上の「24時間営業」を選んでください。", "닫는 시각이 여는 시각보다 이르면 다음날 새벽까지 영업으로 표시돼요.": "閉店が開店より早い場合は、翌日の深夜まで営業と表示されます。", "앞자리": "市外局番", "나머지 번호": "残りの番号", "휴대폰": "携帯", "서울": "ソウル", "경기": "京畿", "인천": "仁川", "강원": "江原", "충남": "忠清南道", "대전": "大田", "충북": "忠清北道", "세종": "世宗", "부산": "釜山", "울산": "蔚山", "대구": "大邱", "경북": "慶尚北道", "경남": "慶尚南道", "전남": "全羅南道", "광주": "光州", "전북": "全羅北道", "제주": "済州", "인터넷 전화": "IP電話", "대표번호 (1588 등)": "代表番号（1588など）", "대표번호는 8자리로 적어 주세요. 예: 1588-1234": "代表番号は8桁で入力してください。例: 1588-1234", "전화번호 뒷자리를 7~8자리로 적어 주세요.": "電話番号の残り7〜8桁を入力してください。", "같은 동네, 같은 주소에 이미 등록된 가게가 있어요": "同じエリア・同じ住所にすでに登録されたお店があります", "같은 가게는 한 번만 등록할 수 있어요.": "同じお店は1回だけ登録できます。", "상세 주소를 입력하면 손님이 찾기 더 편해져요!": "詳細住所を入力すると、お客様が見つけやすくなります！", "선택 · 앞자리를 고르고 나머지 번호를 적어 주세요": "任意 · 市外局番を選び、残りの番号を入力してください", "firebase-config.js 파일에 Firebase 설정값을 넣어 주세요. (README의 2단계)": "firebase-config.js に Firebase の設定値を入れてください（README の手順2）。", "가게를 등록하려면 로그인해 주세요.": "お店を登録するにはログインしてください。", "계정": "アカウント", "계정이 없나요? 이메일로 가입": "アカウントがありませんか？メールで登録", "구글": "Google", "구글·이메일·카카오·네이버로 로그인": "Google・メール・カカオ・NAVERでログイン", "구글로 계속하기": "Googleで続ける", "네이버": "NAVER", "네이버 로그인이 아직 설정되지 않았어요.": "NAVERログインはまだ設定されていません。", "네이버로 계속하기": "NAVERで続ける", "또는 이메일로": "またはメールで", "로그아웃": "ログアウト", "로그아웃하려면 누르세요": "タップしてログアウト", "로그아웃했어요": "ログアウトしました", "로그인": "ログイン", "로그인 안 함": "未ログイン", "로그인이 필요해요. 로그인한 뒤 다시 눌러 주세요.": "ログインが必要です。ログインしてからもう一度押してください。", "로그인하고 동네평을 시작하세요": "ログインして동네평を始めましょう", "로그인하고 리뷰 쓰기": "ログインして口コミを書く", "로그인하기": "ログインする", "로그인하면 가고 싶은 곳을 저장할 수 있어요.": "ログインすると行きたい場所を保存できます。", "로그인하면 리뷰를 쓸 수 있어요.": "ログインすると口コミを書けます。", "로그인하면 좋아요를 누를 수 있어요.": "ログインするといいねできます。", "로그인하지 못했어요. 다시 시도해 주세요.": "ログインできませんでした。もう一度お試しください。", "로그인했어요": "ログインしました", "리뷰 쓰기, 가게 저장, 좋아요, 가게 등록은 로그인 후에 할 수 있어요.": "口コミ投稿、保存、いいね、お店の登録はログイン後に使えます。", "비밀번호": "パスワード", "비밀번호 6자 이상": "6文字以上", "비밀번호 재설정 메일을 보냈어요.": "パスワード再設定メールを送りました。", "비밀번호는 6자 이상이어야 해요.": "パスワードは6文字以上にしてください。", "비밀번호를 잊었나요?": "パスワードをお忘れですか？", "비밀번호를 재설정할 이메일을 먼저 적어 주세요.": "再設定するメールアドレスを先に入力してください。", "서버 연결이 끊겼습니다. 보이는 내용이 최신이 아닐 수 있습니다.": "サーバーとの接続が切れました。表示内容が最新ではない可能性があります。", "서버 응답이 늦어지고 있습니다. 연결되면 자동으로 채워집니다.": "サーバーの応答が遅れています。接続されると自動で表示されます。", "서버에 연결되지 않았어요. 잠시 뒤 다시 시도해 주세요.": "サーバーに接続されていません。少し待ってから再試行してください。", "서버에 연결할 수 없어 가게와 리뷰를 불러오지 못했습니다. 인터넷 연결을 확인해 주세요.": "サーバーに接続できず、お店と口コミを読み込めませんでした。インターネット接続を確認してください。", "시도가 너무 많아요. 잠시 뒤 다시 해 주세요.": "試行回数が多すぎます。しばらくしてからお試しください。", "오늘 번역 한도를 넘었거나 요청이 많아 잠시 멈췄어요. 리뷰 아래 '다시 시도'를 누르면 이어서 번역합니다.": "今日の翻訳上限を超えたか、リクエストが多いため一時停止しました。口コミの下の「再試行」で続けます。", "이 로그인 방식이 아직 켜져 있지 않아요. Firebase 콘솔에서 켜 주세요.": "このログイン方法はまだ有効になっていません。Firebaseコンソールで有効にしてください。", "이 주소에서는 로그인할 수 없어요. Firebase 콘솔의 승인된 도메인에 추가해 주세요.": "このアドレスではログインできません。Firebaseコンソールの承認済みドメインに追加してください。", "이메일": "メール", "이메일 또는 비밀번호가 맞지 않아요.": "メールアドレスまたはパスワードが違います。", "이메일 주소를 확인해 주세요.": "メールアドレスを確認してください。", "이메일로 가입하기": "メールで登録", "이메일로 로그인": "メールでログイン", "이미 가입된 이메일이에요. 로그인해 주세요.": "すでに登録済みのメールです。ログインしてください。", "이미 계정이 있나요? 로그인": "アカウントをお持ちですか？ログイン", "자동 번역 서버가 아직 준비되지 않았어요. 관리자가 번역 키를 설정하면 바로 쓸 수 있어요.": "自動翻訳サーバーはまだ準備中です。管理者が翻訳キーを設定すると使えます。", "자동 번역은 Claude가 합니다. 한 번 번역한 글은 서버에 저장해 다시 번역하지 않습니다.": "自動翻訳はClaudeが行います。一度翻訳した文はサーバーに保存して再利用します。", "저장할 권한이 없어요. 다시 로그인해 주세요.": "保存する権限がありません。もう一度ログインしてください。", "저장할 수 없어요. 같은 주소에 이미 등록된 가게가 있거나, 내 가게가 아니에요.": "保存できません。同じ住所にすでにお店が登録されているか、自分のお店ではありません。", "카카오": "カカオ", "카카오 로그인이 아직 설정되지 않았어요.": "カカオログインはまだ設定されていません。", "카카오로 계속하기": "カカオで続ける", "구글 또는 이메일로 로그인": "Googleまたはメールでログイン", "Google 번역으로 보기": "Google翻訳で見る", "번역 버튼 보이기": "翻訳ボタンを表示", "다른 언어로 쓴 리뷰·답글·가게 소개 아래에 'Google 번역으로 보기' 버튼을 보여 줘요.": "他の言語で書かれた口コミ・返信・紹介の下に「Google翻訳で見る」ボタンを表示します。", "다른 언어로 쓴 글은 'Google 번역으로 보기' 버튼으로 번역해서 볼 수 있습니다.": "他の言語で書かれた文は「Google翻訳で見る」ボタンで翻訳して読めます。", "내 동네, 닉네임": "マイエリア、ニックネーム"}, "zh": {"방금": "刚刚", "분 전": "分钟前", "시간 전": "小时前", "일 전": "天前", "별점 ": "评分 ", "점": "分", "복사했어요": "已复制", "복사하지 못했어요. 길게 눌러 직접 복사해 주세요": "无法复制，请长按手动复制。", "원문 · 번역 보기": "原文 · 查看翻译", "자동 번역됨 · 원문 보기": "自动翻译 · 查看原文", "자동 번역을 쓸 수 없어요 · 설정 보기": "无法使用自动翻译 · 查看设置", "번역 요청이 많아요 · 다시 시도": "翻译请求过多 · 重试", "번역하지 못했어요 · 다시 시도": "翻译失败 · 重试", "번역하는 중…": "正在翻译…", "밝게": "浅色", "어둡게": "深色", "기기 설정 따르기": "跟随系统", "이 화면에서 Claude 번역이 허용되지 않았어요. 페이지를 새로 열면 다시 물어봅니다.": "此页面未允许使用 Claude 翻译。重新打开页面时会再次询问。", "번역 요청이 많아 잠시 멈췄어요. 리뷰 아래 '다시 시도'를 누르면 이어서 번역합니다.": "请求过多，翻译已暂停。点击评价下方的“重试”即可继续。", "지금 보는 화면에서는 자동 번역을 쓸 수 없어요.": "此页面无法使用自动翻译。", "설정": "设置", "프로필": "个人资料", "익명 손님": "匿名顾客", "리뷰에 보이는 닉네임": "评价中显示的昵称", "내 동네": "我的区域", "설정 안 함": "未设置", "주변 탭에서 가까운 곳을 찾을 때 씁니다": "用于在“附近”中查找离你近的地点", "언어": "语言", "리뷰 자동 번역": "自动翻译评价", "다른 언어로 쓴 리뷰·답글·가게 소개를 내 언어로 바꿔 보여 줘요. 번역은 Claude가 합니다.": "将其他语言的评价、回复和店铺介绍翻译成你的语言显示。翻译由 Claude 完成。", "큰 글씨 모드": "大字模式", "글씨와 버튼을 크게 보여 줘요": "放大文字和按钮", "화면 테마": "显示主题", "기기에 저장된 데이터": "本机存储的数据", "개 번역": "条翻译", "번역 기록, 내 동네, 닉네임": "翻译记录、我的区域、昵称", "이용 안내": "使用说明", "앱 정보": "关于", "동네평 미리보기 1.0": "동네평 预览版 1.0", "언어를 바꿨어요": "已切换语言", "닉네임을 저장했어요": "昵称已保存", "닉네임": "昵称", "앞으로 쓰는 리뷰에 쓰입니다. 이미 쓴 리뷰는 리뷰 수정에서 바꿀 수 있어요.": "用于今后写的评价。已写的评价可在编辑时修改。", "저장": "保存", "예: 서울 마포구 망원동": "例如：서울 마포구 망원동", "시·구까지 적어 주세요. 예: 서울 마포구 망원동": "请至少填写市和区，例如：서울 마포구 망원동", "내 동네를 저장했어요": "已保存我的区域", "내 동네를 지웠어요": "已清除我的区域", "시·구·동 순서로 적으면 가까운 곳부터 보여 드려요": "按“市 区 洞”的顺序填写，会优先显示离你近的地点", "모두 지우기": "全部清除", "이 기기에 저장된 데이터를 지웠어요": "已清除本机数据", "번역 기록, 내 동네, 닉네임은 이 기기에만 저장됩니다. 지워도 올린 가게와 리뷰는 그대로 남아요.": "翻译记录、我的区域和昵称只保存在本机。清除后，已发布的店铺和评价不受影响。", "사장님은 가게를 직접 등록하고, 손님 리뷰에는 답글만 달 수 있습니다. 리뷰를 지울 수 없어요.": "店主自行登记店铺，只能回复评价，不能删除评价。", "리뷰는 쓴 사람만 고치거나 지울 수 있습니다.": "只有作者本人可以修改或删除评价。", "자동 번역은 Claude가 합니다. 처음 번역할 때 허용을 묻고, 번역에는 보는 사람의 Claude 사용량이 쓰입니다.": "自动翻译由 Claude 完成。首次翻译时会请求许可，并使用查看者自己的 Claude 用量。", "주변 탭은 GPS 대신 내 동네 주소로 가까운 곳을 찾습니다. 정식 앱에서는 현재 위치로 바뀝니다.": "“附近”使用你设置的区域代替 GPS。正式版将使用当前位置。", "주소 복사": "复制地址", "지도 앱이나 새 창에서 열립니다": "在地图应用或新窗口中打开", "사장님이 전화번호를 등록하지 않았어요": "店主未登记电话号码", "전화 걸기": "拨打电话", "번호 복사": "复制号码", "전화 걸기가 안 되면 번호를 복사해서 걸어 주세요.": "如果无法直接拨打，请复制号码后手动拨打。", "참여 권한이 있어야 즐겨찾기를 할 수 있어요": "需要参与权限才能收藏", "즐겨찾기에서 뺐습니다": "已取消收藏", "즐겨찾기에 담았습니다": "已收藏", " 즐겨찾기 해제": " 取消收藏", " 즐겨찾기": " 收藏", "저장됨 ": "已收藏 ", "즐겨찾기 ": "收藏 ", "이 계정은 보기 전용이라 저장할 수 없습니다. 페이지 주인에게 참여 권한을 요청하세요.": "此账号为只读，无法保存。请向页面所有者申请参与权限。", "저장 공간이 가득 찼습니다. 오래된 글이나 사진을 지운 뒤 다시 시도하세요.": "存储空间已满。请删除旧内容或照片后重试。", "요청이 너무 잦습니다. 잠시 뒤 다시 눌러 주세요.": "请求过于频繁，请稍后再试。", "사진을 올리지 못했습니다. 다른 사진으로 다시 시도하세요.": "照片上传失败，请换一张照片重试。", "저장하지 못했습니다. 연결을 확인하고 다시 눌러 주세요.": "保存失败，请检查网络后重试。", "저장소에 연결할 수 없어 가게와 리뷰를 불러오지 못했습니다. 로그인한 상태로 다시 열어 주세요.": "无法连接存储，店铺和评价未能加载。请在登录状态下重新打开页面。", "보기 전용으로 열려 있습니다. 가게 등록과 리뷰 작성은 참여 권한이 있어야 합니다.": "当前为只读模式。登记店铺和写评价需要参与权限。", "뒤로": "返回", "예시": "示例", "리뷰 ": "评价 ", "새 가게": "新店", "첫 리뷰를 기다려요": "等待第一条评价", "한 번 더 누르면 삭제": "再点一次即删除", "삭제했습니다": "已删除", "좋아요 취소": "取消赞", "좋아요": "赞", "개": "条", "참여 권한이 있어야 좋아요를 누를 수 있어요": "需要参与权限才能点赞", "좋아요 ": "赞 ", "사진 크게 보기": "查看大图", "리뷰 사진": "评价照片", "닫기": "关闭", " 리뷰 사진": " 的评价照片", "홈 보기": "首页视图", "주변": "附近", "트렌드": "热门", "랭킹": "排行榜", "맛집, 핫플, 관광지 검색": "搜索美食、网红打卡、景点", "검색어": "搜索词", "동네평 홈": "동네평 首页", "검색": "搜索", "분류": "分类", "트렌드 1위": "热门第一", "요즘 뜨는 곳 ›": "近期热门 ›", "새로 문 연 곳": "新开张", "첫 리뷰 남기기 ›": "写第一条评价 ›", "불러오는 중입니다…": "加载中…", "아직 리뷰가 없습니다. 다녀온 곳을 평가해 보세요.": "还没有评价。来评价你去过的地方吧。", "리뷰 쓰기": "写评价", "아직 등록된 가게가 없습니다.": "还没有登记的店铺。", "에 등록된 가게가 없습니다.": "暂无已登记的店铺。", "가게 등록하기": "登记店铺", "전체": "全部", "랭킹 분류": "排行分类", " 평점 랭킹": " 评分榜", " · 리뷰가 있는 곳만": " · 仅限有评价的地点", "아직 평가된 곳이 없습니다. 첫 리뷰를 남겨 보세요.": "还没有被评价的地点。来写第一条评价吧。", "요즘 뜨는 곳": "近期热门", "최근 ": "最近", "일 리뷰·즐겨찾기·좋아요가 많이 늘어난 순 · ": "天内评价、收藏、点赞增长最多 · ", "일 동안 새 리뷰나 즐겨찾기가 없습니다.": "天内没有新评价或收藏。", " 사진": " 的照片", "새 리뷰 ": "新评价 ", "즐겨찾기 +": "收藏 +", "좋아요 +": "赞 +", "내 동네를 ": "已将我的区域设为 ", "(으)로 정했어요": "", "이 동네로 보기": "查看此区域", "이 화면에서는 휴대폰 GPS를 쓸 수 없어서, 내 동네 주소를 기준으로 가까운 곳을 찾습니다. 정식 앱에서는 현재 위치와 지도로 바뀝니다.": "此页面无法使用手机 GPS，因此根据你设置的区域地址查找附近地点。正式版将改为当前位置和地图。", "같은 동네 · ": "同一街区 · ", "같은 구 · ": "同一区 · ", "같은 시·도 · ": "同一城市 · ", " 맛집": " 맛집", "지도": "地图", "변경": "更改", "곳": "家", " 근처에 등록된 곳이 아직 없습니다. 다른 동네로 바꾸거나 가게를 등록해 보세요.": " 附近还没有登记的地点。请换个区域或登记店铺。", "모든 지역 ": "全部地区 ", "가게 ": "店铺 ", "지역 선택": "选择地区", "분류를 찾을 수 없습니다.": "找不到该分类。", "홈으로": "返回首页", "전체 ": "全部 ", " 세부 분류": " 细分类", "정렬": "排序", "평점순": "评分最高", "리뷰 많은 순": "评价最多", "신규": "最新", "에 등록된 곳이 아직 없습니다.": "暂无登记的地点。", "가게, 메뉴, 동네 검색": "搜索店铺、菜品、区域", "가게 이름, 메뉴, 동네로 찾아보세요.": "可按店名、菜品或区域搜索。", "'에 맞는 가게가 없습니다.": "' 没有匹配的店铺。", "가게": "店铺", "가게 정보를 불러오는 중입니다…": "正在加载店铺信息…", "가게를 찾을 수 없습니다. 사장님이 삭제했을 수 있습니다.": "找不到该店铺，可能已被店主删除。", "별점 분포": "评分分布", "첫 리뷰": "首条评价", "대기 중": "待评价", "영업시간": "营业时间", "가격대": "价位", "대표 메뉴": "招牌菜", "눌러서 지도 앱 고르기": "点击选择地图应用", "상세 주소 미등록 · 동네 기준으로 지도를 엽니다": "未登记详细地址 · 按区域打开地图", "전화": "电话", "아직 리뷰가 없습니다. 손님이 리뷰를 남기면 여기에 보입니다.": "还没有评价。顾客评价会显示在这里。", "아직 리뷰가 없습니다. 첫 의견을 남겨 주세요.": "还没有评价。来分享第一条感受吧。", "수정": "编辑", "답글 수정": "编辑回复", "답글 달기": "回复", " · 수정됨": " · 已编辑", "사장님 답글": "店主回复", "가게 정보 수정": "编辑店铺信息", "참여 권한이 있어야 리뷰를 쓸 수 있어요": "需要参与权限才能写评价", "내 리뷰 수정": "编辑我的评价", " 대표 사진": " 封面照片", "화면을 보여 주기 위한 예시 가게입니다. 실제 가게가 아닙니다.": "这是用于展示界面的示例店铺，并非真实店铺。", "손님 사진": "顾客照片", "장": "张", "손님 리뷰": "顾客评价", "내 가게": "我的店铺", "가게를 등록하면 손님 리뷰를 받고 답글을 달 수 있어요.": "登记店铺后即可收到评价并回复顾客。", " · 리뷰 ": " · 评价 ", "리뷰 없음": "暂无评价", "삭제": "删除", "가게 하나 더 등록": "再登记一家店铺", "답글 기다리는 리뷰": "待回复的评价", "모든 리뷰에 답글을 달았어요.": "所有评价都已回复。", "아직 받은 리뷰가 없습니다.": "还没有收到评价。", "답글": "回复", "사장님 센터": "商家中心", "평균 별점": "平均评分", "답글 대기": "待回复", "올린 사진": "上传的照片", "사진 빼기": "移除照片", "새 사진": "新照片", "사진 파일만 올릴 수 있어요": "只能上传图片文件", "20MB보다 큰 사진은 올릴 수 없어요": "无法上传超过 20MB 的照片", "가게 등록": "登记店铺", "가게를 등록하려면 참여 권한이 있는 계정으로 로그인해야 합니다.": "请使用有参与权限的账号登录后登记店铺。", "예: 망원 손칼국수": "例如：망원 손칼국수", "예: 포은로 00길 0, 1층": "例如：포은로 00길 0, 1층", "예: 11:00~21:00, 월 휴무": "例如：11:00~21:00，周一休息", "예: 02-000-0000": "例如：02-000-0000", "예: 바지락칼국수, 손만두": "例如：蛤蜊刀削面、手工饺子", "가게를 소개해 주세요. 주차, 예약, 포장 여부를 적어 두면 좋습니다.": "介绍一下你的店铺。写明停车、预约、外带等信息会更方便。", "대표 사진 고르기": "选择封面照片", "수정 내용 저장": "保存修改", "가게 이름을 2자 이상 적어 주세요.": "店名至少需要 2 个字。", "동네를 적어 주세요. 앞 단어(예: 서울)가 지역 필터에 쓰입니다.": "请填写区域。第一个词（例如 서울）用于地区筛选。", "사진 올리는 중 ": "正在上传照片 ", "저장하는 중…": "保存中…", "가게 정보를 저장했습니다": "店铺信息已保存", "가게를 등록했습니다": "店铺已登记", "대표 사진 ": "封面照片 ", "선택 · 가게 목록과 간판에 보입니다": "选填 · 显示在列表和招牌上", "가게 이름": "店名", "세부 업종": "细分类", "가격대 ": "价位 ", "1인 기준": "人均", "동네": "区域", "상세 주소 ": "详细地址 ", "선택": "选填", "영업시간 ": "营业时间 ", "전화 ": "电话 ", "대표 메뉴 ": "招牌菜 ", "가게 소개 ": "店铺介绍 ", "사장님이 직접 가게를 올립니다. 등록하면 바로 홈에 보이고, 손님 리뷰에 답글을 달 수 있습니다. 리뷰를 지우는 기능은 없습니다.": "由店主自行登记店铺。登记后立即显示在首页，并可回复顾客评价。评价无法删除。", "즐겨찾기": "收藏", "저장한 곳": "收藏的地点", "곳 · 최근 저장한 순": "家 · 按收藏时间排序", "가게 이름 옆 책갈피를 누르면 여기에 모입니다. 가고 싶은 맛집과 핫플을 저장해 두세요.": "点击店名旁的书签即可收藏到这里。把想去的美食和打卡地收藏起来吧。", "둘러보기": "去逛逛", "내가 쓴 리뷰": "我写的评价", "다녀온 가게에 첫 리뷰를 남겨 보세요.": "为去过的店铺写下第一条评价吧。", "마이": "我的", "닉네임: ": "昵称：", "익명 손님 (리뷰를 쓸 때 정할 수 있어요)": "匿名顾客（写评价时可设置）", "내 리뷰": "我的评价", "받은 좋아요": "收到的赞", "불러오는 중입니다. 잠시 뒤 다시 눌러 주세요.": "正在加载，请稍后再点。", "가게 이름이나 동네로 찾기": "按店名或区域查找", "리뷰 쓸 가게 찾기": "查找要评价的店铺", "찾는 가게가 없나요? 사장님이 아직 등록하지 않았을 수 있습니다.": "找不到？可能店主还没有登记。", "어느 가게 리뷰를 쓸까요?": "要评价哪家店？", "별점": "评分", "별을 눌러 평가해 주세요": "点击星星评分", "점 ": "分 ", "리뷰 사진 고르기": "选择评价照片", "첫 줄은 피드 카드의 제목으로 보여요.\n맛, 가격, 서비스, 분위기… 느낀 그대로 자유롭게 적어 주세요.": "第一行会作为动态卡片的标题。\n口味、价格、服务、氛围……随意写下你的感受。", "수정 완료": "完成修改", "리뷰 올리기": "发布评价", "별점을 선택해 주세요.": "请选择评分。", "의견을 5자 이상 적어 주세요.": "请至少写 5 个字。", "리뷰를 수정했습니다": "评价已修改", "리뷰를 올렸습니다": "评价已发布", "사진 ": "照片 ", "최대 3장 · 첫 장이 피드에 크게 보여요": "最多 3 张 · 第一张会在动态中大图显示", "의견": "评价内容", "닉네임 ": "昵称 ", "비워 두면 익명 손님": "留空则显示为匿名顾客", "내 리뷰 삭제": "删除我的评价", " 리뷰 수정": " · 编辑评价", " 리뷰 쓰기": " · 写评价", "찾아 주신 손님께 감사 인사나 설명을 남겨 보세요.": "给到店的顾客留下感谢或说明吧。", "답글 저장": "保存回复", "답글 내용을 적어 주세요.": "请输入回复内容。", "답글을 저장했습니다": "回复已保存", "답글을 지웠습니다": "回复已删除", "사장님 답글 ": "店主回复 ", "모두 지우고 저장하면 답글이 삭제됩니다": "清空后保存即删除回复", "저장소 응답이 늦어지고 있습니다. 연결되면 자동으로 채워집니다.": "存储响应较慢，连接后会自动显示。", "보이는 내용이 최신이 아닐 수 있습니다.": "显示的内容可能不是最新的。", "저장소 연결이 끊겼습니다. 보이는 내용이 최신이 아닐 수 있습니다.": "与存储的连接已断开，显示的内容可能不是最新的。", "맛집": "美食", "맛": "食", "한식": "韩餐", "중식": "中餐", "일식": "日料", "양식": "西餐", "분식": "小吃", "치킨": "炸鸡", "피자": "披萨", "고기·구이": "烤肉", "해산물": "海鲜", "아시안": "东南亚菜", "패스트푸드": "快餐", "카페·디저트": "咖啡甜品", "커": "饮", "카페": "咖啡馆", "베이커리": "面包店", "디저트": "甜品", "술집·바": "酒吧", "술": "酒", "호프·포차": "啤酒屋·大排档", "이자카야": "居酒屋", "와인·칵테일바": "葡萄酒·鸡尾酒吧", "엔터테인먼트": "休闲娱乐", "놀": "玩", "노래방": "KTV", "PC방": "网吧", "방탈출·보드게임": "密室·桌游", "영화관": "电影院", "공연·전시": "演出·展览", "볼링·당구": "保龄球·台球", "키즈카페": "儿童乐园", "관광지": "景点", "관": "游", "랜드마크": "地标", "자연·공원": "自然·公园", "박물관·미술관": "博物馆·美术馆", "전통시장·거리": "传统市场·街道", "테마파크": "主题乐园", "핫플": "网红打卡", "핫": "热", "포토스팟": "拍照圣地", "팝업스토어": "快闪店", "루프탑·야경": "天台·夜景", "소품샵": "杂货店", "뷰티·건강": "丽人健康", "뷰": "美", "미용실": "美发", "네일": "美甲", "마사지·스파": "按摩·SPA", "피부관리": "皮肤管理", "숙박": "住宿", "숙": "宿", "호텔": "酒店", "펜션·풀빌라": "民宿·泳池别墅", "게스트하우스": "青年旅舍", "쇼핑": "购物", "쇼": "购", "백화점·몰": "百货·商场", "옷가게": "服装店", "편집숍": "买手店", "생활": "生活服务", "생": "生", "병원·약국": "医院·药店", "세탁·수선": "洗衣·修补", "기타": "其他", "1만원 이하": "1万韩元以下", "1~2만원": "1~2万韩元", "2~4만원": "2~4万韩元", "4만원 이상": "4万韩元以上", "해당 없음": "不适用", "별로예요": "不太好", "아쉬워요": "有待改进", "보통이에요": "一般", "최고예요": "超赞", "전국": "全国", "홈": "首页", "사장님": "商家", "리뷰": "写评价", "하단 메뉴": "底部菜单", "좋았어요": "不错", "네이버 지도": "Naver 地图", "카카오맵": "Kakao 地图", "Google 지도": "Google 地图", "휴무일": "休息日", "여러 개 고를 수 있어요": "可多选", "월": "周一", "화": "周二", "수": "周三", "목": "周四", "금": "周五", "토": "周六", "일": "周日", "공휴일": "法定节假日", "명절(설·추석)": "春节·中秋", "부정기 휴무": "不定期休息", "연중무휴": "全年无休", "오늘 휴무": "今日休息", "예: 11:00~21:00": "例如：11:00~21:00", "취소": "取消", "삭제하기": "删除", "삭제하는 중…": "正在删除…", "삭제할까요?": "确定删除吗？", "삭제하면 되돌릴 수 없어요.": "删除后无法恢复。", "가게를 삭제할까요?": "要删除这家店铺吗？", "가게 정보와 대표 사진이 지워집니다.": "店铺信息和封面照片将被删除。", "받은 리뷰 ": "收到的 ", "개도 앱에서 더 이상 보이지 않아요.": " 条评价也将不再显示。", "리뷰를 삭제할까요?": "要删除这条评价吗？", "리뷰와 올린 사진이 지워집니다.": "评价及其照片将被删除。", "기": "他", "전": "全", "클럽": "夜店", "성인 전용": "仅限成人", "썸네일 사진": "缩略图", "썸네일 사진 고르기": "选择缩略图", "1장 · 홈 화면과 가게 목록에 보여요": "1 张 · 显示在首页和店铺列表中", "가게 사진": "店铺照片", "가게 사진 고르기": "选择店铺照片", "최대 10장 · 가게 화면 맨 위에서 옆으로 넘겨 봅니다": "最多 10 张 · 在店铺页面顶部左右滑动查看", "가게 정보와 가게 사진이 지워집니다.": "店铺信息和照片将被删除。", "사진": "照片", "이전 사진": "上一张", "다음 사진": "下一张", "청소년 출입금지": "未满18岁禁止入内", "성인만 출입할 수 있는 곳이면 체크하세요. 홈 화면과 가게 화면에 청소년 출입금지 표시가 붙습니다. 나이 표시는 보는 사람의 언어에 맞춰 바뀌어요.": "如果仅限成人进入，请勾选。首页和店铺页面会显示年龄限制标识，年龄会根据查看者的语言显示。", "24시간 영업": "24小时营业", "다음날 ": "次日 ", "시간 정하기": "设置时间", "입력 안 함": "不填写", "여는 시각": "开门", "닫는 시각": "关门", "여는 시각과 닫는 시각이 같아요. 24시간 영업이면 위에서 '24시간 영업'을 골라 주세요.": "开门和关门时间相同。如果全天营业，请在上方选择“24小时营业”。", "닫는 시각이 여는 시각보다 이르면 다음날 새벽까지 영업으로 표시돼요.": "如果关门时间早于开门时间，将显示为营业至次日凌晨。", "앞자리": "区号", "나머지 번호": "其余号码", "휴대폰": "手机", "서울": "首尔", "경기": "京畿", "인천": "仁川", "강원": "江原", "충남": "忠清南道", "대전": "大田", "충북": "忠清北道", "세종": "世宗", "부산": "釜山", "울산": "蔚山", "대구": "大邱", "경북": "庆尚北道", "경남": "庆尚南道", "전남": "全罗南道", "광주": "光州", "전북": "全罗北道", "제주": "济州", "인터넷 전화": "网络电话", "대표번호 (1588 등)": "客服号码（1588 等）", "대표번호는 8자리로 적어 주세요. 예: 1588-1234": "客服号码为 8 位，例如：1588-1234", "전화번호 뒷자리를 7~8자리로 적어 주세요.": "请填写电话号码其余的 7~8 位。", "같은 동네, 같은 주소에 이미 등록된 가게가 있어요": "同一区域、同一地址已有登记的店铺", "같은 가게는 한 번만 등록할 수 있어요.": "同一家店只能登记一次。", "상세 주소를 입력하면 손님이 찾기 더 편해져요!": "填写详细地址，顾客更容易找到你！", "선택 · 앞자리를 고르고 나머지 번호를 적어 주세요": "选填 · 选择区号后填写其余号码", "firebase-config.js 파일에 Firebase 설정값을 넣어 주세요. (README의 2단계)": "请在 firebase-config.js 中填写 Firebase 配置（见 README 第 2 步）。", "가게를 등록하려면 로그인해 주세요.": "登记店铺前请先登录。", "계정": "账号", "계정이 없나요? 이메일로 가입": "没有账号？用邮箱注册", "구글": "Google", "구글·이메일·카카오·네이버로 로그인": "使用 Google、邮箱、Kakao 或 Naver 登录", "구글로 계속하기": "使用 Google 继续", "네이버": "Naver", "네이버 로그인이 아직 설정되지 않았어요.": "Naver 登录尚未设置。", "네이버로 계속하기": "使用 Naver 继续", "또는 이메일로": "或使用邮箱", "로그아웃": "退出登录", "로그아웃하려면 누르세요": "点击退出登录", "로그아웃했어요": "已退出登录", "로그인": "登录", "로그인 안 함": "未登录", "로그인이 필요해요. 로그인한 뒤 다시 눌러 주세요.": "需要登录。请登录后再试。", "로그인하고 동네평을 시작하세요": "登录后开始使用동네평", "로그인하고 리뷰 쓰기": "登录后写评价", "로그인하기": "去登录", "로그인하면 가고 싶은 곳을 저장할 수 있어요.": "登录后即可收藏想去的地方。", "로그인하면 리뷰를 쓸 수 있어요.": "登录后即可写评价。", "로그인하면 좋아요를 누를 수 있어요.": "登录后即可点赞。", "로그인하지 못했어요. 다시 시도해 주세요.": "登录失败，请重试。", "로그인했어요": "已登录", "리뷰 쓰기, 가게 저장, 좋아요, 가게 등록은 로그인 후에 할 수 있어요.": "写评价、收藏、点赞和登记店铺需要先登录。", "비밀번호": "密码", "비밀번호 6자 이상": "至少 6 位", "비밀번호 재설정 메일을 보냈어요.": "已发送重置密码邮件。", "비밀번호는 6자 이상이어야 해요.": "密码至少需要 6 位。", "비밀번호를 잊었나요?": "忘记密码？", "비밀번호를 재설정할 이메일을 먼저 적어 주세요.": "请先填写要重置密码的邮箱。", "서버 연결이 끊겼습니다. 보이는 내용이 최신이 아닐 수 있습니다.": "与服务器的连接已断开，显示的内容可能不是最新的。", "서버 응답이 늦어지고 있습니다. 연결되면 자동으로 채워집니다.": "服务器响应较慢，连接后会自动显示。", "서버에 연결되지 않았어요. 잠시 뒤 다시 시도해 주세요.": "未连接到服务器，请稍后再试。", "서버에 연결할 수 없어 가게와 리뷰를 불러오지 못했습니다. 인터넷 연결을 확인해 주세요.": "无法连接服务器，未能加载店铺和评价。请检查网络连接。", "시도가 너무 많아요. 잠시 뒤 다시 해 주세요.": "尝试次数过多，请稍后再试。", "오늘 번역 한도를 넘었거나 요청이 많아 잠시 멈췄어요. 리뷰 아래 '다시 시도'를 누르면 이어서 번역합니다.": "已达到今日翻译上限或请求过多，翻译已暂停。点击评价下方的“重试”继续。", "이 로그인 방식이 아직 켜져 있지 않아요. Firebase 콘솔에서 켜 주세요.": "此登录方式尚未启用，请在 Firebase 控制台中开启。", "이 주소에서는 로그인할 수 없어요. Firebase 콘솔의 승인된 도메인에 추가해 주세요.": "此网址无法登录，请在 Firebase 控制台的已授权网域中添加。", "이메일": "邮箱", "이메일 또는 비밀번호가 맞지 않아요.": "邮箱或密码不正确。", "이메일 주소를 확인해 주세요.": "请检查邮箱地址。", "이메일로 가입하기": "用邮箱注册", "이메일로 로그인": "用邮箱登录", "이미 가입된 이메일이에요. 로그인해 주세요.": "该邮箱已注册，请直接登录。", "이미 계정이 있나요? 로그인": "已有账号？登录", "자동 번역 서버가 아직 준비되지 않았어요. 관리자가 번역 키를 설정하면 바로 쓸 수 있어요.": "自动翻译服务器尚未就绪。管理员设置翻译密钥后即可使用。", "자동 번역은 Claude가 합니다. 한 번 번역한 글은 서버에 저장해 다시 번역하지 않습니다.": "自动翻译由 Claude 完成。翻译过的内容会保存在服务器上重复使用。", "저장할 권한이 없어요. 다시 로그인해 주세요.": "没有保存权限，请重新登录。", "저장할 수 없어요. 같은 주소에 이미 등록된 가게가 있거나, 내 가게가 아니에요.": "无法保存。该地址已有登记的店铺，或这不是你的店铺。", "카카오": "Kakao", "카카오 로그인이 아직 설정되지 않았어요.": "Kakao 登录尚未设置。", "카카오로 계속하기": "使用 Kakao 继续", "구글 또는 이메일로 로그인": "使用 Google 或邮箱登录", "Google 번역으로 보기": "用 Google 翻译查看", "번역 버튼 보이기": "显示翻译按钮", "다른 언어로 쓴 리뷰·답글·가게 소개 아래에 'Google 번역으로 보기' 버튼을 보여 줘요.": "在其他语言的评价、回复和介绍下方显示“用 Google 翻译查看”按钮。", "다른 언어로 쓴 글은 'Google 번역으로 보기' 버튼으로 번역해서 볼 수 있습니다.": "其他语言的内容可通过“用 Google 翻译查看”按钮阅读译文。", "내 동네, 닉네임": "我的区域、昵称"}};
+
+/* ---------- derived data, rebuilt once per data change ---------- */
+var memo={v:-1};
+function M(){
+  if(memo.v===S.ver)return memo;
+  var m={v:S.ver,stores:[],byId:{},reviews:[],byStore:{},stats:{},likeCount:{},myLikes:{},likeAt:{},favCount:{},myFavs:{},favAt:{}};
+  S.stores.forEach(function(items,owner){
+    if(!items||typeof items!=="object")return;
+    Object.keys(items).forEach(function(id){
+      var s=items[id];
+      if(!s||typeof s!=="object"||!/^[a-z0-9]{6,20}$/.test(id))return;
+      var name=str(s.name,30).trim();if(!name)return;
+      var st={id:id,owner:owner,name:name,cat:normCat(s.cat),
+        area:str(s.area,30),address:str(s.address,80),hours:str(s.hours,60),phone:str(s.phone,20),
+        price:PRICES.indexOf(s.price)>=0?s.price:"",menu:str(s.menu,80),desc:str(s.desc,600),
+        photo:cleanIds([s.photo],1)[0]||"",photos:cleanIds(s.photos,10),adult:s.adult===true,open:isTime(s.open)?s.open:"",close:isTime(s.close)?s.close:"",h24:s.h24===true,closed:Array.isArray(s.closed)?s.closed.filter(function(c,i,a){return CLOSED_CODES.indexOf(c)>=0&&a.indexOf(c)===i}):[],createdAt:typeof s.createdAt==="number"?s.createdAt:0,example:owner==="example"};
+      m.stores.push(st);m.byId[id]=st;m.byStore[id]=[];
+    });
+  });
+  S.reviews.forEach(function(items,author){
+    if(!items||typeof items!=="object")return;
+    Object.keys(items).forEach(function(sid){
+      var store=m.byId[sid],r=items[sid];
+      if(!store||!r||typeof r!=="object")return;
+      var rating=Math.round(Number(r.rating));
+      if(!(rating>=1&&rating<=5))return;
+      var rv={author:author,store:store,key:sid+"_"+author,rating:rating,text:str(r.text,1000),
+        nick:str(r.nick,12).trim()||T("익명 손님"),photos:cleanIds(r.photos,3),
+        createdAt:typeof r.createdAt==="number"?r.createdAt:0,edited:!!r.edited};
+      m.reviews.push(rv);m.byStore[sid].push(rv);
+    });
+  });
+  m.reviews.sort(function(a,b){return b.createdAt-a.createdAt});
+  m.stores.forEach(function(s){
+    var list=m.byStore[s.id].sort(function(a,b){return b.createdAt-a.createdAt}),sum=0,dist=[0,0,0,0,0];
+    list.forEach(function(r){sum+=r.rating;dist[r.rating-1]++});
+    m.stats[s.id]={n:list.length,avg:list.length?sum/list.length:0,dist:dist,list:list};
+  });
+  S.likes.forEach(function(items,uid){
+    if(!items||typeof items!=="object")return;
+    Object.keys(items).forEach(function(k){
+      var v=items[k];if(v!==true&&typeof v!=="number")return;
+      m.likeCount[k]=(m.likeCount[k]||0)+1;if(uid===S.uid)m.myLikes[k]=true;
+      if(typeof v==="number"){var sid=k.split("_")[0];(m.likeAt[sid]=m.likeAt[sid]||[]).push(v)}
+    });
+  });
+  S.favs.forEach(function(items,uid){
+    if(!items||typeof items!=="object")return;
+    Object.keys(items).forEach(function(sid){
+      var v=items[sid];if(typeof v!=="number"||!m.byId[sid])return;
+      m.favCount[sid]=(m.favCount[sid]||0)+1;(m.favAt[sid]=m.favAt[sid]||[]).push(v);
+      if(uid===S.uid)m.myFavs[sid]=v;
+    });
+  });
+  memo=m;return m;
+}
+function stats(id){return M().stats[id]||{n:0,avg:0,dist:[0,0,0,0,0],list:[]}}
+function replyOf(store,author){
+  var items=S.replies.get(store.owner),r=items&&items[store.id+"_"+author];
+  if(!r||typeof r!=="object")return null;
+  var t=str(r.text,500).trim();
+  return t?{text:t,createdAt:typeof r.createdAt==="number"?r.createdAt:0}:null;
+}
+
+/* ---------- writes ---------- */
+function trendOf(days){
+  var m=M(),since=Date.now()-days*DAY,out=[];
+  m.stores.forEach(function(s){
+    if(!inRegion(s))return;
+    var r=stats(s.id).list.filter(function(x){return x.createdAt>=since}).length;
+    var f=(m.favAt[s.id]||[]).filter(function(t){return t>=since}).length;
+    var l=(m.likeAt[s.id]||[]).filter(function(t){return t>=since}).length;
+    var score=r*3+f*2+l;
+    if(score>0)out.push({s:s,r:r,f:f,l:l,score:score});
+  });
+  out.sort(function(a,b){return b.score-a.score||stats(b.s.id).avg-stats(a.s.id).avg});
+  return out;
+}
+function toggleFav(s){
+  if(!canWriteNow()){loginSheet(T("로그인하면 가고 싶은 곳을 저장할 수 있어요."));return}
+  var on=!!M().myFavs[s.id];
+  mutate("favs",function(items){if(on)delete items[s.id];else items[s.id]=Date.now()})
+    .then(function(){toast(on?T("즐겨찾기에서 뺐습니다"):T("즐겨찾기에 담았습니다"))},function(x){toast(writeError(x))});
+}
+function favBtn(s,big){
+  var on=!!M().myFavs[s.id],n=M().favCount[s.id]||0;
+  return h("button",{type:"button",class:"favbtn"+(big?" big":""),"aria-pressed":String(on),"aria-label":on?s.name+T(" 즐겨찾기 해제"):s.name+T(" 즐겨찾기"),
+    onclick:function(e){e.preventDefault();e.stopPropagation();toggleFav(s)}},icon("bookmark"),big?h("span",{text:on?T("저장됨 ")+n:T("즐겨찾기 ")+n}):null);
+}
+/* ---------- Firebase writes: each feature edits "my items" and the changes are written as documents ---------- */
+var chain=Promise.resolve();
+var MAPS={stores:S.stores,reviews:S.reviews,replies:S.replies,likes:S.likes,favs:S.favs};
+function cyrb53(str,seed){
+  var h1=0xdeadbeef^seed,h2=0x41c6ce57^seed;
+  for(var i=0,ch;i<str.length;i++){ch=str.charCodeAt(i);h1=Math.imul(h1^ch,2654435761);h2=Math.imul(h2^ch,1597334677)}
+  h1=Math.imul(h1^(h1>>>16),2246822507)^Math.imul(h2^(h2>>>13),3266489909);
+  h2=Math.imul(h2^(h2>>>16),2246822507)^Math.imul(h1^(h1>>>13),3266489909);
+  return(4294967296*(2097151&h2)+(h1>>>0)).toString(16).padStart(14,"0");
+}
+function sha256(t){return Promise.resolve("k"+cyrb53(t,1)+cyrb53(t,7))}
+function addrKeyOf(v){
+  var ad=v.address&&v.address!=="예시 주소"?v.address:"";
+  return sha256(normAddr(v.area)+"|"+(ad?"a:"+normAddr(ad):"n:"+normAddr(v.name)));
+}
+var DOCS={
+  stores:{id:function(k){return k},data:function(k,v){var d=Object.assign({},v);d.ownerId=S.uid;return d}},
+  reviews:{id:function(k){return k+"_"+S.uid},data:function(k,v){var d=Object.assign({},v);d.storeId=k;d.authorId=S.uid;return d}},
+  replies:{id:function(k){return k},data:function(k,v){var i=k.indexOf("_"),d=Object.assign({},v);d.storeId=k.slice(0,i);d.authorId=k.slice(i+1);d.ownerId=S.uid;return d}},
+  likes:{id:function(k){return k+"__"+S.uid},data:function(k,v){return{key:k,uid:S.uid,at:typeof v==="number"?v:Date.now()}}},
+  favs:{id:function(k){return k+"_"+S.uid},data:function(k,v){return{storeId:k,uid:S.uid,at:v}}}
+};
+function strip(v){var d=JSON.parse(JSON.stringify(v||{}));delete d.ownerId;delete d.authorId;delete d.storeId;delete d.uid;delete d.key;return d}
+function mutate(coll,fn){
+  var p=chain.then(function(){
+    if(!S.fs||!canWriteNow())return Promise.reject({code:"auth"});
+    var cur=JSON.parse(JSON.stringify(MAPS[coll].get(S.uid)||{})),next=JSON.parse(JSON.stringify(cur));
+    fn(next);
+    var keys=Object.keys(next),prep=Promise.resolve();
+    if(coll==="stores")prep=Promise.all(keys.map(function(k){return addrKeyOf(next[k]).then(function(a){next[k].addrKey=a})}));
+    return prep.then(function(){
+      var b=fb.writeBatch(S.fs),n=0,D=DOCS[coll];
+      keys.forEach(function(k){
+        var before=cur[k]?JSON.stringify(strip(cur[k])):null;
+        if(before===JSON.stringify(strip(next[k])))return;
+        b.set(fb.doc(S.fs,coll,D.id(k)),D.data(k,coll==="likes"||coll==="favs"?next[k]:strip(next[k])));n++;
+        if(coll==="stores"){
+          var oldKey=cur[k]&&cur[k].addrKey;
+          if(oldKey!==next[k].addrKey){
+            b.set(fb.doc(S.fs,"addrKeys",next[k].addrKey),{storeId:k,ownerId:S.uid});
+            if(oldKey)b.delete(fb.doc(S.fs,"addrKeys",oldKey));
+          }
+        }
+      });
+      Object.keys(cur).forEach(function(k){
+        if(k in next)return;
+        b.delete(fb.doc(S.fs,coll,DOCS[coll].id(k)));n++;
+        if(coll==="stores"&&cur[k].addrKey)b.delete(fb.doc(S.fs,"addrKeys",cur[k].addrKey));
+      });
+      return n?b.commit().catch(function(e){return Promise.reject({code:(e&&e.code)||"unknown",coll:coll})}):null;
+    });
+  });
+  chain=p.catch(function(){});
+  return p;
+}
+function writeError(e){
+  var c=e&&e.code;
+  if(c==="auth"||c==="unauthenticated")return T("로그인이 필요해요. 로그인한 뒤 다시 눌러 주세요.");
+  if(c==="permission-denied"&&e.coll==="stores")return T("저장할 수 없어요. 같은 주소에 이미 등록된 가게가 있거나, 내 가게가 아니에요.");
+  if(c==="permission-denied")return T("저장할 권한이 없어요. 다시 로그인해 주세요.");
+  if(c==="resource-exhausted")return T("요청이 너무 잦습니다. 잠시 뒤 다시 눌러 주세요.");
+  if(c==="upload")return T("사진을 올리지 못했습니다. 다른 사진으로 다시 시도하세요.");
+  return T("저장하지 못했습니다. 연결을 확인하고 다시 눌러 주세요.");
+}
+function canWriteNow(){return !!(S.fs&&S.uid&&!S.anon)}
+function compress(file){
+  return new Promise(function(res,rej){
+    var url=URL.createObjectURL(file),img=new Image();
+    img.onload=function(){
+      var max=1440,w=img.naturalWidth,ht=img.naturalHeight,sc=Math.min(1,max/Math.max(w,ht));
+      var c=document.createElement("canvas");c.width=Math.max(1,Math.round(w*sc));c.height=Math.max(1,Math.round(ht*sc));
+      c.getContext("2d").drawImage(img,0,0,c.width,c.height);URL.revokeObjectURL(url);
+      c.toBlob(function(b){b?res(b):rej({code:"upload"})},"image/jpeg",0.84);
+    };
+    img.onerror=function(){URL.revokeObjectURL(url);rej({code:"upload"})};
+    img.src=url;
+  });
+}
+function toDataURL(b){return new Promise(function(res,rej){var r=new FileReader();r.onload=function(){res(r.result)};r.onerror=rej;r.readAsDataURL(b)})}
+function shrink(file,max,q){
+  return new Promise(function(res,rej){
+    var url=URL.createObjectURL(file),img=new Image();
+    img.onload=function(){
+      var w=img.naturalWidth,ht=img.naturalHeight,sc=Math.min(1,max/Math.max(w,ht));
+      var c=document.createElement("canvas");c.width=Math.max(1,Math.round(w*sc));c.height=Math.max(1,Math.round(ht*sc));
+      c.getContext("2d").drawImage(img,0,0,c.width,c.height);URL.revokeObjectURL(url);
+      res(c.toDataURL("image/jpeg",q));
+    };
+    img.onerror=function(){URL.revokeObjectURL(url);rej({code:"upload"})};
+    img.src=url;
+  });
+}
+// 무료 요금제: 사진을 압축해서 Firestore 문서(photos/{id})에 저장합니다. 한 장에 1MB 미만.
+function uploadAll(files,onStep){
+  var ids=[],i=0;
+  function next(){
+    if(i>=files.length)return Promise.resolve(ids);
+    onStep(i+1,files.length);
+    var f=files[i];
+    return shrink(f,1080,0.72).then(function(d){return d.length<700000?d:shrink(f,800,0.6)}).then(function(d){
+      if(d.length>=950000)return Promise.reject({code:"upload"});
+      var id=newId()+newId();
+      return fb.setDoc(fb.doc(S.fs,"photos",id),{data:d,ownerId:S.uid,at:Date.now()}).then(function(){PHOTO[id]=d;ids.push("fs:"+id);i++;return next()});
+    }).catch(function(){return Promise.reject({code:"upload"})});
+  }
+  return next();
+}
+function dropAssets(list){(list||[]).forEach(function(u){if(typeof u!=="string"||u.indexOf("fs:")!==0||!S.fs)return;fb.deleteDoc(fb.doc(S.fs,"photos",u.slice(3))).catch(function(){})})}
+/* ---------- sign-in ---------- */
+function authError(e){
+  var c=(e&&e.code)||"";
+  if(c==="auth/popup-closed-by-user"||c==="auth/cancelled-popup-request")return"";
+  if(c==="auth/invalid-credential"||c==="auth/wrong-password"||c==="auth/user-not-found"||c==="auth/invalid-login-credentials")return T("이메일 또는 비밀번호가 맞지 않아요.");
+  if(c==="auth/email-already-in-use")return T("이미 가입된 이메일이에요. 로그인해 주세요.");
+  if(c==="auth/weak-password")return T("비밀번호는 6자 이상이어야 해요.");
+  if(c==="auth/invalid-email"||c==="auth/missing-email")return T("이메일 주소를 확인해 주세요.");
+  if(c==="auth/operation-not-allowed")return T("이 로그인 방식이 아직 켜져 있지 않아요. Firebase 콘솔에서 켜 주세요.");
+  if(c==="auth/too-many-requests")return T("시도가 너무 많아요. 잠시 뒤 다시 해 주세요.");
+  if(c==="auth/unauthorized-domain")return T("이 주소에서는 로그인할 수 없어요. Firebase 콘솔의 승인된 도메인에 추가해 주세요.");
+  return T("로그인하지 못했어요. 다시 시도해 주세요.");
+}
+function loginDone(){closeSheet(true);toast(T("로그인했어요"));S.pending=false;render()}
+function loginSheet(reason){
+  if(!S.auth){toast(T("서버에 연결되지 않았어요. 잠시 뒤 다시 시도해 주세요."));return}
+  var mode="login",err=h("p",{class:"err",role:"alert"});
+  var email=h("input",{type:"email",id:"lg-email",autocomplete:"email",placeholder:"name@example.com"});
+  var pw=h("input",{type:"password",id:"lg-pw",autocomplete:"current-password",minlength:"6",placeholder:T("비밀번호 6자 이상")});
+  var submit=h("button",{type:"submit",class:"btn wide"});
+  var swap=h("button",{type:"button",class:"textbtn",onclick:function(){mode=mode==="login"?"signup":"login";paint()}});
+  function paint(){submit.textContent=mode==="login"?T("이메일로 로그인"):T("이메일로 가입하기");
+    swap.textContent=mode==="login"?T("계정이 없나요? 이메일로 가입"):T("이미 계정이 있나요? 로그인");
+    pw.setAttribute("autocomplete",mode==="login"?"current-password":"new-password");err.textContent=""}
+  paint();
+  function fail(e){err.textContent=authError(e)}
+  var form=h("form",{class:"lgform",onsubmit:function(e){
+    e.preventDefault();var em=email.value.trim(),p=pw.value;
+    if(!em){err.textContent=T("이메일 주소를 확인해 주세요.");return}
+    if(p.length<6){err.textContent=T("비밀번호는 6자 이상이어야 해요.");return}
+    submit.disabled=true;err.textContent="";
+    (mode==="login"?fb.signInWithEmailAndPassword(S.auth,em,p):fb.createUserWithEmailAndPassword(S.auth,em,p))
+      .then(loginDone,function(x){submit.disabled=false;fail(x)});
+  }},
+    h("label",{for:"lg-email"},T("이메일"),email),h("label",{for:"lg-pw"},T("비밀번호"),pw),err,submit,
+    h("div",{class:"lgrow"},swap,h("button",{type:"button",class:"textbtn",text:T("비밀번호를 잊었나요?"),onclick:function(){
+      var em=email.value.trim();if(!em){err.textContent=T("비밀번호를 재설정할 이메일을 먼저 적어 주세요.");email.focus();return}
+      fb.sendPasswordResetEmail(S.auth,em).then(function(){err.textContent="";toast(T("비밀번호 재설정 메일을 보냈어요."))},fail);
+    }})));
+  var google=h("button",{type:"button",class:"sbtn google",onclick:function(){
+    var pv=new fb.GoogleAuthProvider();
+    fb.signInWithPopup(S.auth,pv).then(loginDone,function(e){
+      if(e&&(e.code==="auth/popup-blocked"||e.code==="auth/operation-not-supported-in-this-environment"))fb.signInWithRedirect(S.auth,pv);else fail(e);
+    });
+  }},h("span",{class:"slogo",text:"G"}),T("구글로 계속하기"));
+  openSheet(T("로그인"),h("div",{class:"lgwrap"},
+    reason?h("p",{class:"lead",style:"margin:0",text:reason}):null,
+    google,
+    h("div",{class:"lgdiv"},h("span",{text:T("또는 이메일로")})),form));
+}
+function accountLabel(){
+  if(!S.account)return T("로그인 안 함");
+  var pv={google:T("구글"),email:T("이메일")}[S.account.provider]||"";
+  return (S.account.name||S.account.email||"")+(pv?" · "+pv:"");
+}
+function accountSheet(){
+  if(!S.account){loginSheet();return}
+  openSheet(T("계정"),h("div",{style:"display:grid;gap:12px"},
+    h("div",{class:"addrbox"},h("b",{text:accountLabel()})),
+    h("button",{type:"button",class:"btn wide ghost",text:T("로그아웃"),onclick:function(){
+      fb.signOut(S.auth).then(function(){closeSheet(true);toast(T("로그아웃했어요"));render()});
+    }})));
+}
+
+
+/* ---------- shared pieces ---------- */
+function route(){
+  var x=(location.hash||"#home").slice(1);
+  if(x.indexOf("s-")===0)return{name:"store",id:x.slice(2)};
+  if(x==="g-all")return{name:"all"};
+  if(x.indexOf("g-")===0)return{name:"group",i:parseInt(x.slice(2),10)};
+  if(["register","my","favs","boss","search","settings"].indexOf(x)>=0)return{name:x};
+  return{name:"home"};
+}
+function banner(){
+  if(S.status==="setup")return h("p",{class:"notice",text:T("firebase-config.js 파일에 Firebase 설정값을 넣어 주세요. (README의 2단계)")});
+  if(S.status==="nodb")return h("p",{class:"notice",text:T("서버에 연결할 수 없어 가게와 리뷰를 불러오지 못했습니다. 인터넷 연결을 확인해 주세요.")});
+  if(S.note)return h("p",{class:"notice",text:S.note});
+  return null;
+}
+var navStack=[],goingBack=false;
+function prevHash(fallback){return navStack.length?navStack[navStack.length-1]:fallback}
+function goBack(fallback){
+  var to=prevHash(fallback),cur=location.hash||"#home";
+  if(to===cur){navStack.pop();to=prevHash(fallback);if(to===cur)to="#home"}
+  if(navStack.length)goingBack=true;
+  location.hash=to;
+}
+function appbar(title,back,extra){
+  return h("header",{class:"appbar"+(back?" withback":"")},
+    back?h("a",{class:"iconbtn",href:prevHash(back),"aria-label":T("뒤로"),onclick:function(e){e.preventDefault();goBack(back)}},icon("back")):null,
+    title?h("h1",{class:"title",text:title}):null,extra||null);
+}
+function thumb(s,size){
+  var el=h("div",{class:"thumb"+(size?" "+size:"")+(s.photo?" has-img":""),style:"background:"+colorOf(s),"aria-hidden":"true"},first(s.name));
+  if(s.photo)el.append(h("img",{src:blob(s.photo),alt:"",loading:"lazy"}));
+  return el;
+}
+function exBadge(s){return s.example?h("span",{class:"badge",text:T("예시")}):null}
+function adultAge(){return{ko:19,ja:20,zh:18,en:18}[S.lang]||18}
+function adultBadge(s,big){
+  if(!s.adult)return null;
+  return h("span",{class:"adult"+(big?" big":""),title:T("청소년 출입금지"),"aria-label":T("청소년 출입금지")},h("b",{text:adultAge()+"+"}),big?h("span",{text:T("청소년 출입금지")}):null);
+}
+function storeRow(s,rank,note){
+  var st=stats(s.id);
+  return h("div",{class:"srow"},
+    h("a",{class:"srow-link",href:"#s-"+s.id},
+      rank?h("span",{class:"rank"+(rank<=3?" top":""),text:String(rank)}):null,thumb(s),
+      h("div",{class:"sinfo"},
+        h("div",{class:"sname"},s.name,adultBadge(s),exBadge(s),closedToday(s)?h("span",{class:"offday",text:T("오늘 휴무")}):null),
+        st.n?h("div",{class:"score"},h("b",{text:st.avg.toFixed(1)}),stars(Math.round(st.avg)),h("span",{text:T("리뷰 ")+st.n}))
+            :h("div",{class:"score"},h("span",{class:"new",text:T("새 가게")}),h("span",{text:T("첫 리뷰를 기다려요")})),
+        h("div",{class:"sub",text:(groupOf(s).name==="기타"?catLabel(s.cat):T(groupOf(s).name)+" › "+catLabel(s.cat))+(s.area?" · "+s.area:"")+(s.price&&s.price!=="해당 없음"?" · "+T(s.price):"")}),
+        note?h("div",{class:"note"},icon("up"),note):(s.menu?h("div",{class:"menuline",text:trText(s.menu)}):null))),
+    favBtn(s));
+}
+function emptyBox(msg,btnText,href,onclick){
+  return h("div",{class:"empty"},h("p",{text:msg}),btnText?(href?h("a",{class:"btn",href:href,text:btnText}):h("button",{type:"button",class:"btn",text:btnText,onclick:onclick})):null);
+}
+function confirmDialog(opts){
+  var root=document.getElementById("dialog-root"),prev=document.activeElement;
+  function close(){root.textContent="";document.removeEventListener("keydown",esc);if(prev&&prev.focus&&document.body.contains(prev))prev.focus()}
+  function esc(e){if(e.key==="Escape"&&!busy){e.stopPropagation();close()}}
+  var busy=false,err=h("p",{class:"err",role:"alert"});
+  var cancel=h("button",{type:"button",class:"btn ghost",text:T("취소"),onclick:function(){if(!busy)close()}});
+  var ok=h("button",{type:"button",class:"btn",text:opts.okText||T("삭제하기"),onclick:function(){
+    busy=true;ok.disabled=true;cancel.disabled=true;ok.textContent=T("삭제하는 중…");err.textContent="";
+    opts.onOk().then(function(){close();if(opts.done)opts.done()},function(x){busy=false;ok.disabled=false;cancel.disabled=false;ok.textContent=opts.okText||T("삭제하기");err.textContent=writeError(x)});
+  }});
+  var box=h("div",{class:"dialog",role:"alertdialog","aria-modal":"true","aria-labelledby":"dlg-t","aria-describedby":"dlg-b"},
+    h("div",{class:"dlg-mark","aria-hidden":"true",text:"!"}),
+    h("h2",{id:"dlg-t",text:opts.title}),
+    h("div",{id:"dlg-b",class:"dlg-body"},opts.body.map(function(t){return h("p",{text:t})})),
+    err,h("div",{class:"dlg-btns"},cancel,ok));
+  var scrim=h("div",{class:"dscrim",onclick:function(e){if(e.target===scrim&&!busy)close()}},box);
+  root.textContent="";root.append(scrim);
+  document.addEventListener("keydown",esc);
+  setTimeout(function(){cancel.focus()},30);
+}
+function confirmBtn(key,label,action,cls,ask){
+  return h("button",{type:"button",class:cls||"btn small danger",text:label,onclick:function(){
+    confirmDialog({title:ask&&ask.title||T("삭제할까요?"),body:ask&&ask.body||[T("삭제하면 되돌릴 수 없어요.")],onOk:action,
+      done:function(){toast(T("삭제했습니다"));closeSheet(true);S.pending=false;render()}});
+  }});
+}
+function likeBtn(r,big){
+  var m=M(),on=!!m.myLikes[r.key],n=m.likeCount[r.key]||0;
+  return h("button",{type:"button",class:"like","aria-pressed":String(on),"aria-label":(on?T("좋아요 취소"):T("좋아요"))+", "+n+T("개"),onclick:function(e){
+    e.preventDefault();e.stopPropagation();
+    if(!canWriteNow()){loginSheet(T("로그인하면 좋아요를 누를 수 있어요."));return}
+    mutate("likes",function(items){if(on)delete items[r.key];else items[r.key]=Date.now()}).catch(function(x){toast(writeError(x))});
+  }},icon("heart"),big?(on?T("좋아요 ")+n:T("좋아요 ")+n):String(n));
+}
+function viewer(list,idx){
+  if(typeof list==="string"){list=[{src:list}];idx=0}
+  idx=idx||0;
+  var root=document.getElementById("viewer-root");
+  function close(){root.textContent="";document.removeEventListener("keydown",key)}
+  var count=h("span",{class:"vcount"});
+  var track=h("div",{class:"vtrack",onscroll:function(){upd()}},list.map(function(it){
+    return h("div",{class:"vslide",onclick:function(e){if(e.target===e.currentTarget)close()}},h("img",{src:it.src,alt:it.tag||T("사진")}),it.tag?h("span",{class:"vtag",text:it.tag}):null);
+  }));
+  function cur(){return Math.round(track.scrollLeft/Math.max(1,track.clientWidth))}
+  function upd(){count.textContent=(cur()+1)+" / "+list.length}
+  function go(d){var i=Math.max(0,Math.min(list.length-1,cur()+d));track.scrollTo({left:i*track.clientWidth,behavior:"smooth"})}
+  function key(e){if(e.key==="Escape")close();else if(e.key==="ArrowRight")go(1);else if(e.key==="ArrowLeft")go(-1)}
+  root.append(h("div",{class:"viewer",role:"dialog","aria-label":T("사진 크게 보기")},track,
+    list.length>1?h("button",{type:"button",class:"vnav prev","aria-label":T("이전 사진"),onclick:function(){go(-1)}},icon("back")):null,
+    list.length>1?h("button",{type:"button",class:"vnav next","aria-label":T("다음 사진"),onclick:function(){go(1)}},icon("chev")):null,
+    list.length>1?count:null,
+    h("button",{type:"button",class:"iconbtn vclose","aria-label":T("닫기"),onclick:close},icon("close"))));
+  track.scrollLeft=idx*track.clientWidth;upd();
+  document.addEventListener("keydown",key);
+}
+
+/* ---------- feed ---------- */
+function feedCard(r){
+  var media;
+  if(r.photos.length){
+    media=h("span",{class:"fmedia"},h("img",{src:blob(r.photos[0]),alt:r.store.name+T(" 리뷰 사진"),loading:"lazy"}),
+      h("span",{class:"ftag",text:r.store.name+" · ★"+r.rating}),
+      r.photos.length>1?h("span",{class:"fcount",text:"1/"+r.photos.length}):null);
+  }else{
+    var hts=[150,180,210];
+    media=h("span",{class:"fsign",style:"display:flex;min-height:"+hts[hashNum(r.key)%3]+"px;background:"+colorOf(r.store)},
+      h("small",{text:catLabel(r.store.cat)+" · "+regionOf(r.store)}),h("strong",{text:r.store.name}),
+      h("span",{style:"position:relative;z-index:1"},stars(r.rating)));
+  }
+  if(r.store.adult)media.append(h("span",{class:"fadult"},adultBadge(r.store)));
+  return h("article",{class:"fcard"},
+    h("a",{class:"flink",href:"#s-"+r.store.id},media,h("p",{class:"ftitle",text:trText(r.text).split("\n")[0]})),
+    h("div",{class:"ffoot"},h("span",{class:"av","aria-hidden":"true",text:first(r.nick)}),h("span",{class:"who",text:r.nick}),likeBtn(r)));
+}
+function masonry(list){
+  var a=h("div",{class:"mcol"}),b=h("div",{class:"mcol"}),ha=0,hb=0;
+  list.forEach(function(r){
+    var est=(r.photos.length?240:[150,180,210][hashNum(r.key)%3])+80;
+    if(ha<=hb){a.append(feedCard(r));ha+=est}else{b.append(feedCard(r));hb+=est}
+  });
+  return h("div",{class:"mcols"},a,b);
+}
+
+/* ---------- views ---------- */
+function viewHome(){
+  var m=M();
+  var regionTab=h("button",{type:"button",class:"tt","aria-pressed":String(S.homeTab==="feed"),onclick:function(){
+    if(S.homeTab==="feed")regionSheet();else{S.homeTab="feed";render()}
+  }},T(S.region),h("span",{class:"caret","aria-hidden":"true",text:"▼"}));
+  var tabs=h("div",{class:"toptabs",role:"group","aria-label":T("홈 보기")},regionTab,
+    [["near",T("주변")],["trend",T("트렌드")],["rank",T("랭킹")]].map(function(t){
+      return h("button",{type:"button",class:"tt","aria-pressed":String(S.homeTab===t[0]),text:t[1],onclick:function(){S.homeTab=t[0];render()}});
+    }));
+  var q=h("input",{type:"search",id:"q",placeholder:T("맛집, 핫플, 관광지 검색"),value:S.q,enterkeyhint:"search","aria-label":T("검색어")});
+  var srch=h("form",{class:"srch",role:"search",onsubmit:function(e){e.preventDefault();S.q=q.value.trim();location.hash="#search"}},
+    h("a",{class:"logo",href:"#home","aria-label":T("동네평 홈"),text:"평"}),
+    h("div",{class:"sbox"},icon("search"),q,h("button",{type:"submit",class:"sgo",text:T("검색")})));
+
+  var pages=[];for(var pi=0;pi<GROUPS.length;pi+=10)pages.push(GROUPS.slice(pi,pi+10));
+  var dots=pages.length>1?h("div",{class:"dots","aria-hidden":"true"},pages.map(function(_,k){return h("i",{class:k===0?"on":""})})):null;
+  var pager=h("nav",{class:"catpager","aria-label":T("분류"),onscroll:function(){
+    if(!dots)return;var k=Math.round(pager.scrollLeft/Math.max(1,pager.clientWidth));
+    dots.querySelectorAll("i").forEach(function(d,x){d.classList.toggle("on",x===k)});
+  }},pages.map(function(pg,k){
+    return h("div",{class:"catpage"},pg.map(function(g,x){
+      var gi=k*10+x;
+      return h("a",{class:"cbtn",href:"#g-"+gi},h("i",{style:"background:"+g.color,"aria-hidden":"true",text:T(g.glyph)}),T(g.name));
+    }));
+  }));
+  var grid=h("div",{},pager,dots);
+
+  var stores=m.stores.filter(inRegion);
+  var newest=stores.slice().sort(function(a,b){return b.createdAt-a.createdAt});
+  var hot=trendOf(7);if(!hot.length)hot=trendOf(30);
+  var promos=null;
+  if(stores.length){
+    var top=hot.length?hot[0].s:newest[0],fresh=newest.find(function(s){return s!==top})||newest[0];
+    var ts=stats(top.id);
+    promos=h("div",{class:"promos"},
+      h("button",{type:"button",class:"promo",onclick:function(){S.homeTab="trend";render()}},h("h3",{},T("트렌드 1위"),h("small",{text:T("요즘 뜨는 곳 ›")})),
+        h("div",{class:"pbody"},thumb(top,"sm"),h("div",{},h("b",{},top.name,adultBadge(top)),
+          ts.n?h("small",{},"★ "+ts.avg.toFixed(1),h("span",{text:T(groupOf(top).name)})):h("small",{},T(groupOf(top).name),h("span",{text:regionOf(top)}))))),
+      h("a",{class:"promo",href:"#s-"+fresh.id},h("h3",{},T("새로 문 연 곳"),h("small",{text:T("첫 리뷰 남기기 ›")})),
+        h("div",{class:"pbody"},thumb(fresh,"sm"),h("div",{},h("b",{},fresh.name,adultBadge(fresh)),h("small",{},catLabel(fresh.cat),h("span",{text:regionOf(fresh)}))))));
+  }
+
+  var body;
+  if(S.status==="loading")body=h("p",{class:"empty",text:T("불러오는 중입니다…")});
+  else if(S.homeTab==="near")body=nearBody();
+  else if(S.homeTab==="trend")body=trendBody();
+  else if(S.homeTab==="rank")body=rankBody(stores);
+  else{
+    var rs=m.reviews.filter(function(r){return inRegion(r.store)}).slice(0,80);
+    if(rs.length)body=masonry(rs);
+    else if(stores.length)body=emptyBox(T("아직 리뷰가 없습니다. 다녀온 곳을 평가해 보세요."),T("리뷰 쓰기"),null,pickStoreSheet);
+    else body=emptyBox(S.region==="전국"?T("아직 등록된 가게가 없습니다."):T(S.region)+T("에 등록된 가게가 없습니다."),T("가게 등록하기"),"#register");
+  }
+  return[h("div",{class:"homehead"},tabs,srch),banner(),h("div",{class:"cats"},grid),promos,body];
+}
+
+function chipRow(items,cur,onpick,label){
+  return h("div",{class:"chips",role:"group","aria-label":label},items.map(function(it){
+    return h("button",{type:"button",class:"chip","aria-pressed":String(cur===it[0]),text:it[1],onclick:function(){onpick(it[0])}});
+  }));
+}
+
+function rankBody(stores){
+  var list=stores.filter(function(s){return stats(s.id).n&&(S.rankGroup<0||SUB2G[s.cat]===S.rankGroup)})
+    .sort(function(a,b){var x=stats(a.id),y=stats(b.id);return y.avg-x.avg||y.n-x.n});
+  var chips=chipRow([[-1,T("전체")]].concat(GROUPS.map(function(g,i){return[i,T(g.name)]})),S.rankGroup,function(v){S.rankGroup=v;render()},T("랭킹 분류"));
+  return h("div",{style:"margin-top:8px"},
+    h("div",{class:"secthead"},h("h2",{text:(S.rankGroup<0?T("전체"):T(GROUPS[S.rankGroup].name))+T(" 평점 랭킹")}),h("small",{text:T(S.region)+T(" · 리뷰가 있는 곳만")})),chips,
+    list.length?h("div",{class:"list"},list.slice(0,50).map(function(s,i){return storeRow(s,i+1)}))
+      :emptyBox(T("아직 평가된 곳이 없습니다. 첫 리뷰를 남겨 보세요."),T("리뷰 쓰기"),null,pickStoreSheet));
+}
+
+function trendBody(){
+  var days=7,list=trendOf(7);
+  if(list.length<3){var l30=trendOf(30);if(l30.length>list.length){list=l30;days=30}}
+  var head=h("div",{class:"secthead"},h("h2",{text:T("요즘 뜨는 곳")}),
+    h("small",{text:T("최근 ")+days+T("일 리뷰·즐겨찾기·좋아요가 많이 늘어난 순 · ")+S.region}));
+  if(!list.length)return h("div",{style:"margin-top:8px"},head,emptyBox(T("최근 ")+days+T("일 동안 새 리뷰나 즐겨찾기가 없습니다."),T("리뷰 쓰기"),null,pickStoreSheet));
+  var photos=[];
+  list.slice(0,10).forEach(function(t){stats(t.s.id).list.forEach(function(r){if(r.photos.length&&photos.length<10)photos.push(r)})});
+  return h("div",{style:"margin-top:8px"},head,
+    photos.length?h("div",{class:"tstrip"},photos.map(function(r){
+      return h("a",{class:"tcard",href:"#s-"+r.store.id},h("img",{src:blob(r.photos[0]),alt:r.store.name+T(" 사진"),loading:"lazy"}),h("span",{text:r.store.name}));
+    })):null,
+    h("div",{class:"list"},list.slice(0,30).map(function(t,i){
+      var bits=[];if(t.r)bits.push(T("새 리뷰 ")+t.r);if(t.f)bits.push(T("즐겨찾기 +")+t.f);if(t.l)bits.push(T("좋아요 +")+t.l);
+      return storeRow(t.s,i+1,bits.join(" · "));
+    })));
+}
+
+function areaTokens(a){return (a||"").trim().split(/\s+/).filter(Boolean)}
+function nearLevel(mine,area){
+  var a=areaTokens(mine),b=areaTokens(area),n=0;
+  while(n<a.length&&n<b.length&&a[n]===b[n])n++;
+  return n;
+}
+function nearBody(){
+  var my=lsGet("dnp-area");
+  var areas={};M().stores.forEach(function(s){if(s.area)areas[s.area]=1});
+  function setter(initial){
+    var inp=h("input",{type:"text",id:"my-area",list:"area-list",maxlength:"30",placeholder:T("예: 서울 마포구 망원동"),value:initial||""});
+    var dl=h("datalist",{id:"area-list"},Object.keys(areas).sort().map(function(a){return h("option",{value:a})}));
+    return h("form",{class:"block",style:"display:grid;gap:10px",onsubmit:function(e){
+      e.preventDefault();var v=inp.value.trim().replace(/\s+/g," ");
+      if(areaTokens(v).length<2){toast(T("시·구까지 적어 주세요. 예: 서울 마포구 망원동"));inp.focus();return}
+      lsSet("dnp-area",v);toast(T("내 동네를 ")+v+T("(으)로 정했어요"));inp.blur();S.pending=false;render();
+    }},
+      h("label",{for:"my-area"},T("내 동네"),h("small",{text:T("시·구·동 순서로 적으면 가까운 곳부터 보여 드려요")}),inp),dl,
+      h("button",{type:"submit",class:"btn",text:T("이 동네로 보기")}));
+  }
+  var note=h("p",{class:"hint"},icon("pin"),T("이 화면에서는 휴대폰 GPS를 쓸 수 없어서, 내 동네 주소를 기준으로 가까운 곳을 찾습니다. 정식 앱에서는 현재 위치와 지도로 바뀝니다."));
+  if(!my)return h("div",{style:"margin-top:8px"},note,setter(""));
+  var groups=[[],[],[]];
+  M().stores.forEach(function(s){
+    var lv=nearLevel(my,s.area);
+    if(lv>=3)groups[0].push(s);else if(lv===2)groups[1].push(s);else if(lv===1)groups[2].push(s);
+  });
+  var t=areaTokens(my);
+  var titles=[T("같은 동네 · ")+(t[2]||t.slice(-1)[0]),T("같은 구 · ")+(t[1]||""),T("같은 시·도 · ")+t[0]];
+  function byRating(a,b){return stats(b.id).avg-stats(a.id).avg||stats(b.id).n-stats(a.id).n}
+  var box=h("div",{style:"margin-top:8px"},
+    h("div",{class:"mybar"},icon("pin"),h("div",{class:"grow"},h("small",{text:T("내 동네")}),h("b",{text:my})),
+      h("a",{class:"btn small",href:"https://map.naver.com/p/search/"+encodeURIComponent(my+T(" 맛집")),text:T("지도")}),
+      h("button",{type:"button",class:"btn small",text:T("변경"),onclick:function(){lsSet("dnp-area","");render()}})));
+  var any=false;
+  groups.forEach(function(g,i){
+    if(!g.length)return;any=true;
+    box.append(h("div",{class:"secthead"},h("h2",{text:titles[i]}),h("small",{text:g.length+T("곳")})),
+      h("div",{class:"list"},g.sort(byRating).slice(0,30).map(function(s){return storeRow(s)})));
+  });
+  if(!any)box.append(emptyBox(t[0]+T(" 근처에 등록된 곳이 아직 없습니다. 다른 동네로 바꾸거나 가게를 등록해 보세요."),T("가게 등록하기"),"#register"));
+  return box;
+}
+
+function regionSheet(){
+  var counts={};M().stores.forEach(function(s){var r=regionOf(s);counts[r]=(counts[r]||0)+1});
+  var names=Object.keys(counts).sort(function(a,b){return counts[b]-counts[a]});
+  var list=h("div",{class:"optlist"},["전국"].concat(names).map(function(n){
+    return h("button",{type:"button",class:"opt","aria-current":String(S.region===n),onclick:function(){S.region=n;closeSheet(true);render()}},
+      h("div",{class:"grow"},h("b",{text:T(n)}),h("small",{text:n==="전국"?T("모든 지역 ")+M().stores.length+T("곳"):T("가게 ")+counts[n]+T("곳")})));
+  }));
+  openSheet(T("지역 선택"),list);
+}
+
+function viewAll(){
+  var all=M().stores.filter(inRegion);
+  var counts={};all.forEach(function(s){var g=SUB2G[s.cat];counts[g]=(counts[g]||0)+1});
+  var list=all.filter(function(s){return S.allGroup<0||SUB2G[s.cat]===S.allGroup});
+  list.sort(function(a,b){
+    var x=stats(a.id),y=stats(b.id);
+    if(S.catSort==="new")return b.createdAt-a.createdAt;
+    if(S.catSort==="count")return y.n-x.n||y.avg-x.avg;
+    return y.avg-x.avg||y.n-x.n;
+  });
+  var chips=chipRow([[-1,T("전체 ")+all.length]].concat(GROUPS.map(function(g,i){return[i,T(g.name)+(counts[i]?" "+counts[i]:"")]})),S.allGroup,function(v){S.allGroup=v;render()},T("분류"));
+  var seg=h("div",{class:"seg",role:"group","aria-label":T("정렬")},[["rating",T("평점순")],["count",T("리뷰 많은 순")],["new",T("신규")]].map(function(o){
+    return h("button",{type:"button","aria-pressed":String(S.catSort===o[0]),text:o[1],onclick:function(){S.catSort=o[0];render()}});
+  }));
+  return[appbar(T("전체")+(S.region==="전국"?"":" · "+S.region),"#home"),h("div",{class:"groupbar"},chips),seg,banner(),
+    list.length?h("div",{class:"list"},list.map(function(s){return storeRow(s)}))
+      :emptyBox(T("아직 등록된 가게가 없습니다."),T("가게 등록하기"),"#register")];
+}
+
+function viewGroup(i){
+  var g=GROUPS[i];
+  if(!g)return[appbar(T("분류"),"#home"),emptyBox(T("분류를 찾을 수 없습니다."),T("홈으로"),"#home")];
+  if(S.subGroup!==i){S.subGroup=i;S.sub=""}
+  var inGroup=M().stores.filter(function(s){return SUB2G[s.cat]===i&&inRegion(s)});
+  var counts={};inGroup.forEach(function(s){counts[s.cat]=(counts[s.cat]||0)+1});
+  var list=inGroup.filter(function(s){return !S.sub||s.cat===S.sub});
+  list.sort(function(a,b){
+    var x=stats(a.id),y=stats(b.id);
+    if(S.catSort==="new")return b.createdAt-a.createdAt;
+    if(S.catSort==="count")return y.n-x.n||y.avg-x.avg;
+    return y.avg-x.avg||y.n-x.n;
+  });
+  var chips=chipRow([["",T("전체 ")+inGroup.length]].concat(g.subs.map(function(s){return[s,catLabel(s)+(counts[s]?" "+counts[s]:"")]})),S.sub,function(v){S.sub=v;render()},T(g.name)+T(" 세부 분류"));
+  var seg=h("div",{class:"seg",role:"group","aria-label":T("정렬")},[["rating",T("평점순")],["count",T("리뷰 많은 순")],["new",T("신규")]].map(function(o){
+    return h("button",{type:"button","aria-pressed":String(S.catSort===o[0]),text:o[1],onclick:function(){S.catSort=o[0];render()}});
+  }));
+  return[appbar(T(g.name)+(S.region==="전국"?"":" · "+S.region),"#home"),h("div",{class:"groupbar"},chips),seg,banner(),
+    list.length?h("div",{class:"list"},list.map(function(s){return storeRow(s)}))
+      :emptyBox((S.sub?catLabel(S.sub):T(g.name))+T("에 등록된 곳이 아직 없습니다."),T("가게 등록하기"),"#register")];
+}
+
+function viewSearch(){
+  var q=h("input",{type:"search",id:"q2",placeholder:T("가게, 메뉴, 동네 검색"),value:S.q,enterkeyhint:"search","aria-label":T("검색어")});
+  var box=h("div",{});
+  function draw(){
+    var t=S.q.trim().toLowerCase();box.textContent="";
+    if(!t){box.append(h("p",{class:"empty",text:T("가게 이름, 메뉴, 동네로 찾아보세요.")}));return}
+    var res=M().stores.filter(function(s){return (s.name+" "+s.area+" "+s.menu+" "+s.cat+" "+catLabel(s.cat)+" "+groupOf(s).name+" "+T(groupOf(s).name)+" "+s.desc).toLowerCase().indexOf(t)>=0});
+    res.sort(function(a,b){return stats(b.id).avg-stats(a.id).avg});
+    if(!res.length)box.append(h("p",{class:"empty",text:"'"+S.q.trim()+T("'에 맞는 가게가 없습니다.")}));
+    else box.append(h("div",{class:"list"},res.map(function(s){return storeRow(s)})));
+  }
+  q.addEventListener("input",function(){S.q=q.value;draw()});
+  draw();
+  setTimeout(function(){if(!S.q)q.focus()},50);
+  return[appbar("","#home",h("div",{class:"sbox",style:"margin-left:0"},icon("search"),q)),box];
+}
+
+function viewStore(id){
+  if(S.status==="loading")return[appbar(T("가게"),"#home"),h("p",{class:"empty",text:T("가게 정보를 불러오는 중입니다…")})];
+  var s=M().byId[id];
+  if(!s)return[appbar(T("가게"),"#home"),emptyBox(T("가게를 찾을 수 없습니다. 사장님이 삭제했을 수 있습니다."),T("홈으로"),"#home")];
+  var st=stats(s.id),isOwner=!!S.uid&&s.owner===S.uid,mine=null;
+  st.list.forEach(function(r){if(r.author===S.uid)mine=r});
+  var max=Math.max.apply(null,st.dist.concat([1]));
+  var bars=h("div",{class:"bars","aria-label":T("별점 분포")},[5,4,3,2,1].map(function(n){
+    var u=h("u",{});u.style.width=(st.dist[n-1]/max*100)+"%";
+    return h("div",{},h("span",{text:n+T("점")}),h("i",{},u),h("span",{text:String(st.dist[n-1])}));
+  }));
+  var stampEl=st.n?h("div",{class:"stamp"},h("b",{text:st.avg.toFixed(1)}),h("span",{text:T("리뷰 ")+st.n}))
+    :h("div",{class:"stamp none"},h("span",{text:T("첫 리뷰")}),h("span",{text:T("대기 중")}));
+  var dl=h("dl",{class:"info"});
+  [[T("영업시간"),hoursText(s)],[T("휴무일"),closedText(s.closed)],[T("가격대"),s.price?T(s.price):""],[T("대표 메뉴"),s.menu?trText(s.menu):""]].forEach(function(p){
+    if(p[1])dl.append(h("dt",{text:p[0]}),h("dd",{text:p[1]}));
+  });
+  if(closedToday(s)){var dds=dl.querySelectorAll("dd");dl.querySelectorAll("dt").forEach(function(dt,i){if(dt.textContent===T("휴무일"))dds[i].append(" ",h("span",{class:"offday",text:T("오늘 휴무")}))})}
+  var realAddr=s.address&&s.address!=="예시 주소"?s.address:"";
+  var addrRow=h("div",{class:"addr"},
+    h("button",{type:"button",class:"addr-text",onclick:function(){mapSheet(s)}},h("b",{text:realAddr?s.area+" "+realAddr:s.area}),
+      h("small",{text:realAddr?T("눌러서 지도 앱 고르기"):T("상세 주소 미등록 · 동네 기준으로 지도를 엽니다")})),
+    h("button",{type:"button",class:"act",onclick:function(){mapSheet(s)}},icon("map"),h("span",{text:T("지도")})),
+    h("button",{type:"button",class:"act"+(s.phone?"":" off"),onclick:function(){phoneSheet(s)}},icon("phone"),h("span",{text:T("전화")})));
+  var shopPh=s.photos.map(function(p){return{src:blob(p),tag:T("가게 사진")}});
+  var custPh=[];st.list.forEach(function(r){r.photos.forEach(function(p){custPh.push({src:blob(p),tag:T("손님 사진")+" · "+r.nick})})});
+  function photoSection(title,items){
+    if(!items.length)return null;
+    return h("section",{class:"block"},h("div",{class:"block-h"},h("h2",{text:title}),h("small",{text:items.length+T("장")})),
+      h("div",{class:"strip big"},items.map(function(it,i){
+        return h("button",{type:"button","aria-label":T("사진 크게 보기")+" "+(i+1)+"/"+items.length,onclick:function(){viewer(items,i)}},h("img",{src:it.src,alt:"",loading:"lazy"}));
+      })));
+  }
+
+  var list=h("div",{});
+  if(!st.n)list.append(h("p",{class:"empty",style:"padding:24px 8px",text:isOwner?T("아직 리뷰가 없습니다. 손님이 리뷰를 남기면 여기에 보입니다."):T("아직 리뷰가 없습니다. 첫 의견을 남겨 주세요.")}));
+  st.list.forEach(function(r){
+    var rep=replyOf(s,r.author),acts=h("div",{class:"rv-actions"},likeBtn(r));
+    if(r.author===S.uid&&canWriteNow())acts.append(h("button",{type:"button",class:"textbtn",style:"margin-left:12px",text:T("수정"),onclick:function(){reviewSheet(s,r)}}));
+    if(isOwner&&canWriteNow())acts.append(h("button",{type:"button",class:"textbtn",style:"margin-left:12px",text:rep?T("답글 수정"):T("답글 달기"),onclick:function(){replySheet(s,r,rep)}}));
+    list.append(h("article",{class:"rv"},
+      h("div",{class:"rv-head"},h("div",{class:"avatar","aria-hidden":"true",text:first(r.nick)}),
+        h("div",{class:"rv-who"},h("b",{text:r.nick}),h("time",{text:fmtDate(r.createdAt)+(r.edited?T(" · 수정됨"):"")})),
+        h("span",{style:"margin-left:auto"},stars(r.rating))),
+      trBlock(r.text,"rv-text"),
+      r.photos.length?h("div",{class:"pgrid"},r.photos.map(function(p,pi){
+        return h("button",{type:"button","aria-label":T("사진 크게 보기"),onclick:function(){viewer(r.photos.map(function(x){return{src:blob(x),tag:r.nick}}),pi)}},h("img",{src:blob(p),alt:"",loading:"lazy"}));
+      })):null,
+      rep?h("div",{class:"reply"},h("b",{text:T("사장님 답글")}),trBlock(rep.text,"rtext")):null,acts));
+  });
+
+  var action;
+  if(isOwner)action=h("a",{class:"btn ghost",href:"#register",onclick:function(){S.editId=s.id}},icon("pen"),T("가게 정보 수정"));
+  else if(!canWriteNow())action=h("button",{type:"button",class:"btn",onclick:function(){loginSheet(T("로그인하면 리뷰를 쓸 수 있어요."))}},icon("pen"),T("로그인하고 리뷰 쓰기"));
+  else action=h("button",{type:"button",class:"btn",onclick:function(){reviewSheet(s,mine)}},icon("pen"),mine?T("내 리뷰 수정"):T("리뷰 쓰기"));
+
+  var hero=h("div",{class:"hero"+(s.photo?" has-img":""),style:"background:"+colorOf(s)});
+  if(s.photo)hero.append(h("img",{src:blob(s.photo),alt:s.name+T(" 대표 사진")}),h("button",{type:"button",class:"herozoom","aria-label":T("사진 크게 보기"),onclick:function(){viewer([{src:blob(s.photo),tag:s.name}],0)}}));
+  hero.append(h("small",{text:catLabel(s.cat)+(s.area?" · "+s.area:"")}),h("strong",{text:s.name}));
+  if(s.adult)hero.append(h("span",{style:"position:relative;z-index:2;margin-top:6px"},adultBadge(s,true)));
+
+  return[appbar(s.name,"#home"),banner(),hero,
+    s.example?h("p",{class:"notice",text:T("화면을 보여 주기 위한 예시 가게입니다. 실제 가게가 아닙니다.")}):null,
+    h("section",{class:"block",style:"margin-top:0"},h("div",{class:"summary"},stampEl,bars)),
+    h("section",{class:"block"},dl.childNodes.length?dl:null,addrRow),
+    s.desc?h("section",{class:"block"},trBlock(s.desc,"desc")):null,
+    photoSection(T("가게 사진"),shopPh),
+    photoSection(T("손님 사진"),custPh),
+    h("section",{class:"block"},h("div",{class:"block-h"},h("h2",{text:T("손님 리뷰")}),h("small",{text:st.n+T("개")})),list),
+    h("div",{class:"actionbar"},favBtn(s,true),action)];
+}
+
+function viewBoss(){
+  var m=M(),mine=m.stores.filter(function(s){return !!S.uid&&s.owner===S.uid});
+  var received=[],waiting=[];
+  mine.forEach(function(s){stats(s.id).list.forEach(function(r){received.push(r);if(!replyOf(s,r.author))waiting.push(r)})});
+  waiting.sort(function(a,b){return b.createdAt-a.createdAt});
+  var avg=0;if(received.length){received.forEach(function(r){avg+=r.rating});avg/=received.length}
+
+  var stores=h("section",{class:"block"},h("div",{class:"block-h"},h("h2",{text:T("내 가게")}),h("small",{text:mine.length+T("곳")})));
+  if(!mine.length)stores.append(emptyBox(T("가게를 등록하면 손님 리뷰를 받고 답글을 달 수 있어요."),T("가게 등록하기"),"#register"));
+  mine.forEach(function(s){
+    var st=stats(s.id);
+    stores.append(h("div",{class:"mrow"},thumb(s,"sm"),
+      h("a",{class:"grow",href:"#s-"+s.id},h("b",{text:s.name}),h("small",{text:st.n?"★ "+st.avg.toFixed(1)+T(" · 리뷰 ")+st.n:T("리뷰 없음")})),
+      h("div",{class:"mbtns"},
+        h("a",{class:"btn small",href:"#register",text:T("수정"),onclick:function(){S.editId=s.id}}),
+        confirmBtn("st-"+s.id,T("삭제"),function(){var p=(s.photo?[s.photo]:[]).concat(s.photos);return mutate("stores",function(items){delete items[s.id]}).then(function(){dropAssets(p)})},null,
+          {title:T("가게를 삭제할까요?"),body:[s.name,T("가게 정보와 가게 사진이 지워집니다."),
+            st.n?T("받은 리뷰 ")+st.n+T("개도 앱에서 더 이상 보이지 않아요."):null,T("삭제하면 되돌릴 수 없어요.")].filter(Boolean)}))));
+  });
+  if(mine.length)stores.append(h("a",{class:"btn ghost wide",href:"#register",style:"margin-top:8px",onclick:function(){S.editId=null}},icon("plus"),T("가게 하나 더 등록")));
+
+  var wait=h("section",{class:"block"},h("div",{class:"block-h"},h("h2",{text:T("답글 기다리는 리뷰")}),h("small",{text:waiting.length+T("개")})));
+  if(!waiting.length)wait.append(h("p",{class:"empty",style:"padding:20px",text:mine.length?T("모든 리뷰에 답글을 달았어요."):T("아직 받은 리뷰가 없습니다.")}));
+  waiting.slice(0,30).forEach(function(r){
+    wait.append(h("div",{class:"mrow"},h("div",{class:"avatar","aria-hidden":"true",text:first(r.nick)}),
+      h("a",{class:"grow",href:"#s-"+r.store.id},h("b",{},r.nick," ",stars(r.rating)),h("small",{text:r.store.name+" · "+clip(trText(r.text),36)})),
+      canWriteNow()?h("button",{type:"button",class:"btn small hot",text:T("답글"),onclick:function(){replySheet(r.store,r,null)}}):null));
+  });
+
+  return[appbar(T("사장님 센터")),banner(),
+    h("section",{class:"block",style:"margin-top:0"},h("div",{class:"tiles"},
+      h("div",{class:"tile"},h("b",{text:String(mine.length)}),h("span",{text:T("내 가게")})),
+      h("div",{class:"tile"},h("b",{text:received.length?avg.toFixed(1):"-"}),h("span",{text:T("평균 별점")})),
+      h("div",{class:"tile"},h("b",{text:String(waiting.length)}),h("span",{text:T("답글 대기")})))),
+    wait,stores];
+}
+
+function photoPicker(initial,max,label){
+  var kept=initial.slice(),added=[];
+  var wrap=h("div",{});
+  function draw(){
+    wrap.textContent="";
+    var row=h("div",{class:"picker"});
+    kept.forEach(function(id,i){row.append(h("div",{class:"pthumb"},h("img",{src:blob(id),alt:T("올린 사진")}),
+      h("button",{type:"button",class:"rm","aria-label":T("사진 빼기"),onclick:function(){kept.splice(i,1);draw()}},icon("close"))))});
+    added.forEach(function(a,i){row.append(h("div",{class:"pthumb"},h("img",{src:a.url,alt:T("새 사진")}),
+      h("button",{type:"button",class:"rm","aria-label":T("사진 빼기"),onclick:function(){URL.revokeObjectURL(a.url);added.splice(i,1);draw()}},icon("close"))))});
+    if(kept.length+added.length<max){
+      var inp=h("input",{type:"file",accept:"image/*",multiple:max>1,"aria-label":label,onchange:function(){
+        Array.from(inp.files||[]).forEach(function(f){
+          if(kept.length+added.length>=max)return;
+          if(!/^image\//.test(f.type)){toast(T("사진 파일만 올릴 수 있어요"));return}
+          if(f.size>20*1024*1024){toast(T("20MB보다 큰 사진은 올릴 수 없어요"));return}
+          added.push({file:f,url:URL.createObjectURL(f)});
+        });
+        draw();
+      }});
+      row.append(h("label",{class:"padd"},icon("camera"),(kept.length+added.length)+"/"+max,inp));
+    }
+    wrap.append(row);
+  }
+  draw();
+  return{el:wrap,initial:initial.slice(),kept:function(){return kept.slice()},files:function(){return added.map(function(a){return a.file})}};
+}
+
+function viewRegister(){
+  var editing=null;
+  if(S.editId){var f=M().byId[S.editId];if(f&&f.owner===S.uid)editing=f;else S.editId=null}
+  var title=editing?T("가게 정보 수정"):T("가게 등록");
+  if(!canWriteNow()&&S.status!=="loading")return[appbar(title,"#boss"),banner(),emptyBox(T("가게를 등록하려면 로그인해 주세요."),T("로그인하기"),null,function(){loginSheet()})];
+  var v=editing||{};
+  function inp(id,ph,max,val,type){return h("input",{type:type||"text",id:id,maxlength:String(max),placeholder:ph,value:val||""})}
+  var name=inp("st-name",T("예: 망원 손칼국수"),30,v.name);
+  var curG=v.cat?SUB2G[v.cat]:0;
+  var grp=h("select",{id:"st-group",onchange:function(){fillSubs(+grp.value,"")}},GROUPS.map(function(g,i){return h("option",{value:String(i),text:T(g.name)})}));grp.value=String(curG);
+  var cat=h("select",{id:"st-cat"});
+  function fillSubs(gi,sel){cat.textContent="";GROUPS[gi].subs.forEach(function(c){cat.append(h("option",{value:c,text:catLabel(c)}))});cat.value=sel||GROUPS[gi].subs[0]}
+  fillSubs(curG,v.cat);
+  var area=inp("st-area",T("예: 서울 마포구 망원동"),30,v.area);
+  var address=inp("st-address",T("예: 포은로 00길 0, 1층"),80,v.address);
+  var hm=v.h24?"24h":(v.open&&v.close?"set":"none"),hOpen=v.open||"11:00",hClose=v.close||"21:00";
+  if(hm==="none"&&v.hours){var mt=v.hours.match(/(\d{1,2}):(\d{2})\s*[~\-–]\s*(\d{1,2}):(\d{2})/);
+    if(mt){var a1=("0"+mt[1]).slice(-2)+":"+mt[2],a2=("0"+mt[3]).slice(-2)+":"+mt[4];if(isTime(a1)&&isTime(a2)){hm="set";hOpen=a1;hClose=a2}}}
+  var hoursBox=h("div",{class:"hoursbox"});
+  function drawHours(){
+    hoursBox.textContent="";
+    hoursBox.append(h("div",{class:"daypick",role:"group","aria-label":T("영업시간")},[["set",T("시간 정하기")],["24h",T("24시간 영업")],["none",T("입력 안 함")]].map(function(o){
+      return h("button",{type:"button",class:"daychip","aria-pressed":String(hm===o[0]),text:o[1],onclick:function(){hm=o[0];drawHours()}});
+    })));
+    if(hm!=="set")return;
+    function tsel(id,val,on){var el=h("select",{id:id,onchange:function(){on(el.value);drawNote()}},TIMES.map(function(t){return h("option",{value:t,text:t})}));el.value=val;return el}
+    var note=h("p",{class:"tnote"});
+    function drawNote(){note.textContent=hClose===hOpen?T("여는 시각과 닫는 시각이 같아요. 24시간 영업이면 위에서 '24시간 영업'을 골라 주세요."):hClose<hOpen?T("닫는 시각이 여는 시각보다 이르면 다음날 새벽까지 영업으로 표시돼요."):""}
+    hoursBox.append(h("div",{class:"timerow"},
+      h("label",{for:"st-open"},T("여는 시각"),tsel("st-open",hOpen,function(x){hOpen=x})),
+      h("span",{class:"tilde","aria-hidden":"true",text:"~"}),
+      h("label",{for:"st-close"},T("닫는 시각"),tsel("st-close",hClose,function(x){hClose=x}))),note);
+    drawNote();
+  }
+  drawHours();
+  var closedSel=(v.closed||[]).slice();
+  var closedBox=h("div",{class:"daypick",role:"group","aria-labelledby":"closed-lbl"});
+  function drawClosed(){
+    closedBox.textContent="";
+    CLOSED.forEach(function(c){
+      closedBox.append(h("button",{type:"button",class:"daychip"+(c[0].length===3&&["hol","irr"].indexOf(c[0])<0?" day":""),"aria-pressed":String(closedSel.indexOf(c[0])>=0),text:T(c[1]),onclick:function(){
+        var i=closedSel.indexOf(c[0]);
+        if(i>=0)closedSel.splice(i,1);
+        else if(c[0]==="none")closedSel=["none"];
+        else{closedSel=closedSel.filter(function(x){return x!=="none"});closedSel.push(c[0])}
+        drawClosed();
+      }}));
+    });
+  }
+  drawClosed();
+  var ph0=splitPhone(v.phone);
+  var phPre=h("select",{id:"st-phone-pre","aria-label":T("앞자리")},PHONE_PRE.map(function(p){return h("option",{value:p[0],text:(p[0]==="rep"?"":p[0]+" ")+T(p[1])})}));phPre.value=ph0.pre;
+  var phone=h("input",{type:"tel",id:"st-phone",inputmode:"numeric",maxlength:"9",placeholder:"1234-5678",value:ph0.rest,"aria-label":T("나머지 번호"),oninput:function(){
+    var d=phone.value.replace(/[^0-9]/g,"").slice(0,8);phone.value=fmtRest(d);
+  }});
+  phPre.addEventListener("change",function(){phone.placeholder=phPre.value==="rep"?"1588-1234":"1234-5678";phone.focus()});
+  if(ph0.pre==="rep")phone.placeholder="1588-1234";
+  var price=h("select",{id:"st-price"},PRICES.map(function(c){return h("option",{value:c,text:T(c)})}));price.value=v.price||"1~2만원";
+  var menu=inp("st-menu",T("예: 바지락칼국수, 손만두"),80,v.menu);
+  var desc=h("textarea",{id:"st-desc",maxlength:"600",placeholder:T("가게를 소개해 주세요. 주차, 예약, 포장 여부를 적어 두면 좋습니다.")});desc.value=v.desc||"";
+  var pick=S.assets?photoPicker(v.photo?[v.photo]:[],1,T("썸네일 사진 고르기")):null;
+  var gpick=S.assets?photoPicker(v.photos||[],10,T("가게 사진 고르기")):null;
+  var adultTouched=!!editing;
+  var adult=h("input",{type:"checkbox",id:"st-adult",onchange:function(){adultTouched=true}});adult.checked=!!v.adult;
+  grp.addEventListener("change",function(){if(!adultTouched)adult.checked=GROUPS[+grp.value].name==="술집·바"});
+  var err=h("p",{class:"err",role:"alert"});
+  var btn=h("button",{type:"submit",class:"btn wide",text:editing?T("수정 내용 저장"):T("가게 등록하기")});
+  var form=h("form",{onsubmit:function(e){
+    e.preventDefault();
+    var n=name.value.trim(),a=area.value.trim();
+    if(n.length<2){err.textContent=T("가게 이름을 2자 이상 적어 주세요.");name.focus();return}
+    if(!a){err.textContent=T("동네를 적어 주세요. 앞 단어(예: 서울)가 지역 필터에 쓰입니다.");area.focus();return}
+    var pd=phone.value.replace(/[^0-9]/g,""),phoneStr="";
+    if(pd){
+      if(phPre.value==="rep"){if(pd.length!==8){err.textContent=T("대표번호는 8자리로 적어 주세요. 예: 1588-1234");phone.focus();return}phoneStr=fmtRest(pd)}
+      else{if(pd.length<7){err.textContent=T("전화번호 뒷자리를 7~8자리로 적어 주세요.");phone.focus();return}phoneStr=phPre.value+"-"+fmtRest(pd)}
+    }
+    var dup=findDup(editing?editing.id:null,a,address.value.trim(),n);
+    if(dup){err.textContent=T("같은 동네, 같은 주소에 이미 등록된 가게가 있어요")+": "+dup.name+". "+T("같은 가게는 한 번만 등록할 수 있어요.");area.focus();return}
+    btn.disabled=true;err.textContent="";
+    var id=editing?editing.id:newId();
+    var tf=pick?pick.files():[],gf=gpick?gpick.files():[],files=tf.concat(gf);
+    var up=files.length?uploadAll(files,function(i,t){btn.textContent=T("사진 올리는 중 ")+i+"/"+t},"stores"):Promise.resolve([]);
+    var photos;
+    up.then(function(ids){
+      var photo=(pick?pick.kept().concat(ids.slice(0,tf.length)):(v.photo?[v.photo]:[]))[0]||"";
+      photos=(gpick?gpick.kept().concat(ids.slice(tf.length)):(v.photos||[])).slice(0,10);
+      btn.textContent=T("저장하는 중…");
+      return mutate("stores",function(items){
+        items[id]={name:n,cat:cat.value,area:a,address:address.value.trim(),hours:hm==="24h"?"24시간 영업":hm==="set"?hOpen+"~"+hClose:"",open:hm==="set"?hOpen:"",close:hm==="set"?hClose:"",h24:hm==="24h",closed:CLOSED_CODES.filter(function(c){return closedSel.indexOf(c)>=0}),phone:phoneStr,
+          price:price.value,menu:menu.value.trim(),desc:desc.value.trim(),photo:photo,photos:photos,adult:adult.checked,createdAt:editing?editing.createdAt:Date.now()};
+      }).then(function(){if(pick)dropAssets(pick.initial.filter(function(x){return x!==photo}));if(gpick)dropAssets(gpick.initial.filter(function(x){return photos.indexOf(x)<0}))});
+    }).then(function(){toast(editing?T("가게 정보를 저장했습니다"):T("가게를 등록했습니다"));S.editId=null;S.pending=false;location.hash="#s-"+id},
+      function(x){btn.disabled=false;btn.textContent=editing?T("수정 내용 저장"):T("가게 등록하기");err.textContent=writeError(x)});
+  }},
+    pick?h("div",{},h("p",{class:"lbl"},T("썸네일 사진")+" ",h("small",{text:T("1장 · 홈 화면과 가게 목록에 보여요")})),pick.el):null,
+    gpick?h("div",{},h("p",{class:"lbl"},T("가게 사진")+" ",h("small",{text:T("최대 10장 · 가게 화면 맨 위에서 옆으로 넘겨 봅니다")})),gpick.el):null,
+    h("label",{for:"st-name"},T("가게 이름"),name),
+    h("div",{class:"two"},h("label",{for:"st-group"},T("분류"),grp),h("label",{for:"st-cat"},T("세부 업종"),cat)),
+    h("label",{class:"check",for:"st-adult"},adult,h("span",{},h("b",{},T("성인 전용"),adultBadge({adult:true})),
+      h("small",{text:T("성인만 출입할 수 있는 곳이면 체크하세요. 홈 화면과 가게 화면에 청소년 출입금지 표시가 붙습니다. 나이 표시는 보는 사람의 언어에 맞춰 바뀌어요.")}))),
+    h("label",{for:"st-price"},h("span",{},T("가격대 "),h("small",{text:T("1인 기준")})),price),
+    h("label",{for:"st-area"},T("동네"),area),
+    h("label",{for:"st-address"},h("span",{},T("상세 주소 "),h("small",{text:T("선택")})),address,
+      h("small",{class:"tip",text:T("상세 주소를 입력하면 손님이 찾기 더 편해져요!")})),
+    h("div",{},h("p",{class:"lbl"},T("영업시간 "),h("small",{text:T("선택")})),hoursBox),
+    h("div",{},h("p",{class:"lbl"},T("전화 "),h("small",{text:T("선택 · 앞자리를 고르고 나머지 번호를 적어 주세요")})),
+      h("div",{class:"phonerow"},phPre,h("span",{class:"tilde","aria-hidden":"true",text:"-"}),phone)),
+    h("div",{},h("p",{class:"lbl",id:"closed-lbl"},T("휴무일")+" ",h("small",{text:T("여러 개 고를 수 있어요")})),closedBox),
+    h("label",{for:"st-menu"},h("span",{},T("대표 메뉴 "),h("small",{text:T("선택")})),menu),
+    h("label",{for:"st-desc"},h("span",{},T("가게 소개 "),h("small",{text:T("선택")})),desc),
+    err,btn);
+  return[appbar(title,"#boss"),banner(),
+    h("section",{class:"block",style:"margin-top:0"},
+      h("p",{class:"lead",text:T("사장님이 직접 가게를 올립니다. 등록하면 바로 홈에 보이고, 손님 리뷰에 답글을 달 수 있습니다. 리뷰를 지우는 기능은 없습니다.")}),form)];
+}
+
+function viewFavs(){
+  var m=M(),ids=Object.keys(m.myFavs).filter(function(id){return m.byId[id]}).sort(function(a,b){return m.myFavs[b]-m.myFavs[a]});
+  var list=ids.map(function(id){return m.byId[id]});
+  return[appbar(T("즐겨찾기")),banner(),
+    S.status==="loading"?h("p",{class:"empty",text:T("불러오는 중입니다…")})
+      :list.length?h("div",{},h("div",{class:"secthead"},h("h2",{text:T("저장한 곳")}),h("small",{text:list.length+T("곳 · 최근 저장한 순")})),
+        h("div",{class:"list"},list.map(function(s){return storeRow(s)})))
+      :emptyBox(T("가게 이름 옆 책갈피를 누르면 여기에 모입니다. 가고 싶은 맛집과 핫플을 저장해 두세요."),T("둘러보기"),"#home")];
+}
+
+function viewMy(){
+  var m=M(),mine=m.reviews.filter(function(r){return !!S.uid&&r.author===S.uid});
+  var got=0;mine.forEach(function(r){got+=m.likeCount[r.key]||0});
+  var photos=0;mine.forEach(function(r){photos+=r.photos.length});
+  var list=h("section",{class:"block"},h("div",{class:"block-h"},h("h2",{text:T("내가 쓴 리뷰")}),h("small",{text:mine.length+T("개")})));
+  if(!mine.length)list.append(emptyBox(T("다녀온 가게에 첫 리뷰를 남겨 보세요."),T("리뷰 쓰기"),null,pickStoreSheet));
+  mine.forEach(function(r){
+    list.append(h("div",{class:"mrow"},thumb(r.store,"sm"),
+      h("a",{class:"grow",href:"#s-"+r.store.id},h("b",{},r.store.name," ",stars(r.rating)),h("small",{text:clip(trText(r.text),40)})),
+      h("div",{class:"mbtns"},
+        h("button",{type:"button",class:"btn small",text:T("수정"),onclick:function(){reviewSheet(r.store,r)}}),
+        confirmBtn("rv-"+r.store.id,T("삭제"),function(){var p=r.photos;return mutate("reviews",function(items){delete items[r.store.id]}).then(function(){dropAssets(p)})},null,
+          {title:T("리뷰를 삭제할까요?"),body:[r.store.name,T("리뷰와 올린 사진이 지워집니다."),T("삭제하면 되돌릴 수 없어요.")]}))));
+  });
+  return[appbar(T("마이"),null,h("a",{class:"iconbtn",href:"#settings","aria-label":T("설정")},icon("gear"))),banner(),
+    !canWriteNow()&&S.auth?h("section",{class:"block logincard"},h("div",{},h("b",{text:T("로그인하고 동네평을 시작하세요")}),h("small",{text:T("리뷰 쓰기, 가게 저장, 좋아요, 가게 등록은 로그인 후에 할 수 있어요.")})),
+      h("button",{type:"button",class:"btn",text:T("로그인"),onclick:function(){loginSheet()}})):null,
+    h("section",{class:"block",style:"margin-top:0"},
+      h("div",{class:"lbl",style:"margin-bottom:12px"},T("닉네임: "),h("small",{text:lsGet("dnp-nick")||T("익명 손님 (리뷰를 쓸 때 정할 수 있어요)")})),
+      h("div",{class:"tiles"},
+        h("div",{class:"tile"},h("b",{text:String(mine.length)}),h("span",{text:T("내 리뷰")})),
+        h("div",{class:"tile"},h("b",{text:String(photos)}),h("span",{text:T("올린 사진")})),
+        h("div",{class:"tile"},h("b",{text:String(got)}),h("span",{text:T("받은 좋아요")})))),
+    list];
+}
+
+/* ---------- bottom sheets ---------- */
+function openSheet(title,body){
+  closeSheet(true);
+  var sheet=h("div",{class:"sheet",role:"dialog","aria-modal":"true","aria-label":title},
+    h("div",{class:"handle","aria-hidden":"true"}),
+    h("div",{class:"sheet-h"},h("h2",{text:title}),h("button",{type:"button",class:"iconbtn","aria-label":T("닫기"),onclick:function(){closeSheet()}},icon("close"))),
+    body);
+  var scrim=h("div",{class:"scrim",onclick:function(e){if(e.target===scrim)closeSheet()}},sheet);
+  document.getElementById("sheet-root").append(scrim);
+  document.body.classList.add("locked");S.sheet=true;
+  setTimeout(function(){var f=sheet.querySelector("input:checked,input[type=search],textarea,button.opt");if(f)f.focus()},60);
+}
+function closeSheet(quiet){
+  var root=document.getElementById("sheet-root");
+  if(!root.firstChild)return;
+  root.textContent="";document.body.classList.remove("locked");S.sheet=false;
+  if(!quiet&&S.pending){S.pending=false;refresh()}
+}
+document.addEventListener("keydown",function(e){if(e.key==="Escape"&&S.sheet&&!document.getElementById("viewer-root").firstChild&&!document.getElementById("dialog-root").firstChild)closeSheet()});
+
+function pickStoreSheet(){
+  if(!canWriteNow()){if(S.status==="loading"||!S.auth)toast(T("불러오는 중입니다. 잠시 뒤 다시 눌러 주세요."));else loginSheet(T("로그인하면 리뷰를 쓸 수 있어요."));return}
+  var all=M().stores.filter(function(s){return s.owner!==S.uid});
+  var q=h("input",{type:"search",id:"pick-q",placeholder:T("가게 이름이나 동네로 찾기"),"aria-label":T("리뷰 쓸 가게 찾기")});
+  var list=h("div",{class:"optlist"});
+  function draw(){
+    var t=q.value.trim().toLowerCase();list.textContent="";
+    var res=all.filter(function(s){return !t||(s.name+" "+s.area+" "+s.menu).toLowerCase().indexOf(t)>=0}).slice(0,40);
+    if(!res.length)list.append(h("div",{class:"empty",style:"padding:24px"},h("p",{text:T("찾는 가게가 없나요? 사장님이 아직 등록하지 않았을 수 있습니다.")})));
+    res.forEach(function(s){
+      list.append(h("button",{type:"button",class:"opt",onclick:function(){
+        var mine=null;stats(s.id).list.forEach(function(r){if(r.author===S.uid)mine=r});reviewSheet(s,mine);
+      }},thumb(s,"xs"),h("div",{class:"grow"},h("b",{},s.name,adultBadge(s)),h("small",{text:catLabel(s.cat)+" · "+s.area}))));
+    });
+  }
+  q.addEventListener("input",draw);draw();
+  openSheet(T("어느 가게 리뷰를 쓸까요?"),h("div",{style:"display:grid;gap:8px"},h("div",{class:"sbox",style:"border-width:1.5px"},icon("search"),q),list));
+}
+document.getElementById("write-pill").addEventListener("click",pickStoreSheet);
+
+function reviewSheet(store,mine){
+  var rating=mine?mine.rating:0,err=h("p",{class:"err",role:"alert"});
+  var word=h("p",{class:"rate-word"});
+  var rate=h("fieldset",{class:"rate"},h("legend",{text:T("별점")}));
+  var labels=[];
+  function paint(){labels.forEach(function(l,i){l.classList.toggle("on",i<rating)});word.textContent=rating?T(RATE_WORD[rating]):T("별을 눌러 평가해 주세요")}
+  [1,2,3,4,5].forEach(function(n){
+    var inp=h("input",{type:"radio",name:"rating",id:"rate-"+n,value:String(n),onchange:function(){rating=n;paint()}});
+    if(n===rating)inp.checked=true;
+    var lab=h("label",{for:"rate-"+n,"aria-label":n+T("점 ")+T(RATE_WORD[n]),text:"★"});
+    labels.push(lab);rate.append(inp,lab);
+  });
+  paint();
+  var pick=S.assets?photoPicker(mine?mine.photos:[],3,T("리뷰 사진 고르기")):null;
+  var nick=h("input",{type:"text",id:"rv-nick",maxlength:"12",placeholder:T("익명 손님"),value:mine?mine.nick:(lsGet("dnp-nick")||(S.account&&S.account.name)||"").slice(0,12)});
+  var text=h("textarea",{id:"rv-text",maxlength:"1000",placeholder:T("첫 줄은 피드 카드의 제목으로 보여요.\n맛, 가격, 서비스, 분위기… 느낀 그대로 자유롭게 적어 주세요.")});
+  text.value=mine?mine.text:"";
+  var label=mine?T("수정 완료"):T("리뷰 올리기");
+  var btn=h("button",{type:"submit",class:"btn wide",text:label});
+  var form=h("form",{onsubmit:function(e){
+    e.preventDefault();
+    var t=text.value.trim();
+    if(!rating){err.textContent=T("별점을 선택해 주세요.");return}
+    if(t.length<5){err.textContent=T("의견을 5자 이상 적어 주세요.");text.focus();return}
+    btn.disabled=true;err.textContent="";
+    var n=nick.value.trim().slice(0,12);lsSet("dnp-nick",n);
+    var files=pick?pick.files():[];
+    var up=files.length?uploadAll(files,function(i,tot){btn.textContent=T("사진 올리는 중 ")+i+"/"+tot},"reviews"):Promise.resolve([]);
+    var photos;
+    up.then(function(ids){
+      photos=(pick?pick.kept():(mine?mine.photos:[])).concat(ids).slice(0,3);
+      btn.textContent=T("저장하는 중…");
+      return mutate("reviews",function(items){
+        items[store.id]={rating:rating,text:t.slice(0,1000),nick:n,photos:photos,createdAt:mine?mine.createdAt:Date.now(),edited:!!mine};
+      });
+    }).then(function(){
+      if(pick)dropAssets(pick.initial.filter(function(x){return photos.indexOf(x)<0}));
+      closeSheet(true);toast(mine?T("리뷰를 수정했습니다"):T("리뷰를 올렸습니다"));S.pending=false;
+      if(location.hash!=="#s-"+store.id)location.hash="#s-"+store.id;else render();
+    },function(x){btn.disabled=false;btn.textContent=label;err.textContent=writeError(x)});
+  }},
+    h("div",{},rate,word),
+    pick?h("div",{},h("p",{class:"lbl"},T("사진 "),h("small",{text:T("최대 3장 · 첫 장이 피드에 크게 보여요")})),pick.el):null,
+    h("label",{for:"rv-text"},T("의견"),text),
+    h("label",{for:"rv-nick"},h("span",{},T("닉네임 "),h("small",{text:T("비워 두면 익명 손님")})),nick),
+    err,btn,
+    mine?confirmBtn("rvs-"+store.id,T("내 리뷰 삭제"),function(){var p=mine.photos;return mutate("reviews",function(items){delete items[store.id]}).then(function(){dropAssets(p)})},"btn wide danger",
+      {title:T("리뷰를 삭제할까요?"),body:[store.name,T("리뷰와 올린 사진이 지워집니다."),T("삭제하면 되돌릴 수 없어요.")]}):null);
+  openSheet(store.name+(mine?T(" 리뷰 수정"):T(" 리뷰 쓰기")),form);
+}
+
+function replySheet(store,review,rep){
+  var key=store.id+"_"+review.author,err=h("p",{class:"err",role:"alert"});
+  var text=h("textarea",{id:"rp-text",maxlength:"500",placeholder:T("찾아 주신 손님께 감사 인사나 설명을 남겨 보세요.")});
+  text.value=rep?rep.text:"";
+  var btn=h("button",{type:"submit",class:"btn wide",text:T("답글 저장")});
+  var form=h("form",{onsubmit:function(e){
+    e.preventDefault();
+    var t=text.value.trim();
+    if(!t&&!rep){err.textContent=T("답글 내용을 적어 주세요.");return}
+    btn.disabled=true;err.textContent="";
+    mutate("replies",function(items){if(t)items[key]={text:t.slice(0,500),createdAt:Date.now()};else delete items[key]})
+      .then(function(){closeSheet(true);toast(t?T("답글을 저장했습니다"):T("답글을 지웠습니다"));S.pending=false;render()},
+        function(x){btn.disabled=false;err.textContent=writeError(x)});
+  }},
+    h("div",{},h("div",{class:"rv-head"},h("b",{text:review.nick}),stars(review.rating)),trBlock(review.text,"quote")),
+    h("label",{for:"rp-text"},h("span",{},T("사장님 답글 "),h("small",{text:rep?T("모두 지우고 저장하면 답글이 삭제됩니다"):""})),text),
+    err,btn);
+  openSheet(T("답글 달기"),form);
+}
+
+/* ---------- render ---------- */
+var lastHash=null;
+function render(){
+  var r=route(),hash=location.hash||"#home",app=document.getElementById("app");
+  if(hash!==lastHash){
+    S.confirm=null;
+    if(lastHash!==null&&r.name!=="register")S.editId=null;
+    if(lastHash!==null){
+      if(["home","boss","favs","my"].indexOf(r.name)>=0)navStack=[];
+      else if(goingBack)navStack.pop();
+      else{navStack.push(lastHash);if(navStack.length>30)navStack.shift()}
+    }
+    goingBack=false;
+    if(lastHash!==null)scroller.scrollTop=0;
+    lastHash=hash;
+  }
+  applySettings();
+  document.body.classList.toggle("no-tabs",r.name==="store");
+  var tabFor={home:"home",group:"home",all:"home",search:"home",boss:"boss",register:"boss",favs:"favs",my:"my",settings:"my"}[r.name];
+  document.querySelectorAll("#tabbar a").forEach(function(a){
+    if(a.getAttribute("data-r")===tabFor)a.setAttribute("aria-current","page");else a.removeAttribute("aria-current");
+  });
+  var kids=r.name==="store"?viewStore(r.id):r.name==="group"?viewGroup(r.i):r.name==="all"?viewAll():r.name==="search"?viewSearch():r.name==="register"?viewRegister()
+    :r.name==="boss"?viewBoss():r.name==="favs"?viewFavs():r.name==="my"?viewMy():r.name==="settings"?viewSettings():viewHome();
+  app.textContent="";
+  kids.forEach(function(k){if(k)app.append(k)});
+}
+function typing(){
+  var a=document.activeElement;
+  return !!(a&&a.matches&&a.matches("input,textarea,select")&&document.getElementById("app").contains(a));
+}
+function refresh(){
+  if(typing()){S.pending=true;return}
+  var y=scroller.scrollTop,pg=document.querySelector(".catpager"),px=pg?pg.scrollLeft:0;
+  render();
+  scroller.scrollTop=y;
+  var pg2=document.querySelector(".catpager");if(pg2&&px)pg2.scrollLeft=px;
+}
+document.addEventListener("focusout",function(){setTimeout(function(){if(S.pending&&!typing()&&!S.sheet){S.pending=false;refresh()}},0)});
+window.addEventListener("hashchange",function(){closeSheet(true);S.pending=false;render()});
+
+/* ---------- boot (Firebase) ---------- */
+var slow=setTimeout(function(){
+  if(S.status==="loading"){S.status="ready";S.note=T("서버 응답이 늦어지고 있습니다. 연결되면 자동으로 채워집니다.")}
+  else S.note=T("보이는 내용이 최신이 아닐 수 있습니다.");
+  refresh();
+},10000);
+var READ={
+  stores:function(map,d){var x=d.data(),o=x.ownerId;if(!o)return;var m=map.get(o)||{};m[d.id]=x;map.set(o,m)},
+  reviews:function(map,d){var x=d.data();if(!x.authorId||!x.storeId)return;var m=map.get(x.authorId)||{};m[x.storeId]=x;map.set(x.authorId,m)},
+  replies:function(map,d){var x=d.data();if(!x.ownerId)return;var m=map.get(x.ownerId)||{};m[x.storeId+"_"+x.authorId]=x;map.set(x.ownerId,m)},
+  likes:function(map,d){var x=d.data();if(!x.uid||!x.key)return;var m=map.get(x.uid)||{};m[x.key]=x.at;map.set(x.uid,m)},
+  favs:function(map,d){var x=d.data();if(!x.uid||!x.storeId)return;var m=map.get(x.uid)||{};m[x.storeId]=x.at;map.set(x.uid,m)}
+};
+function listen(coll){
+  var map=MAPS[coll],q=coll==="stores"?fb.query(fb.collection(S.fs,coll),fb.orderBy("createdAt","desc"),fb.limit(1000))
+    :coll==="reviews"?fb.query(fb.collection(S.fs,coll),fb.orderBy("createdAt","desc"),fb.limit(3000))
+    :fb.query(fb.collection(S.fs,coll),fb.limit(10000));
+  fb.onSnapshot(q,function(snap){
+    map.clear();
+    snap.docs.forEach(function(d){READ[coll](map,d)});
+    S.got[coll]=true;S.ver++;
+    if(S.got.stores&&S.got.reviews&&S.got.replies&&S.got.likes&&S.got.favs&&S.status==="loading")S.status="ready";
+    if(!snap.metadata.fromCache){clearTimeout(slow);S.note=""}
+    refresh();
+  },function(){
+    clearTimeout(slow);if(S.status==="loading")S.status="nodb";
+    S.note=T("서버 연결이 끊겼습니다. 보이는 내용이 최신이 아닐 수 있습니다.");refresh();
+  });
+}
+render();
+(function(){
+  var cfg=window.DNP_CONFIG||{};
+  if(!cfg.firebase||!cfg.firebase.apiKey||/YOUR|여기/.test(cfg.firebase.apiKey)){clearTimeout(slow);S.status="setup";render();return}
+  try{
+    var app=fb.initializeApp(cfg.firebase);
+    S.auth=fb.getAuth(app);
+    try{S.fs=fb.initializeFirestore(app,{localCache:fb.persistentLocalCache({tabManager:fb.persistentMultipleTabManager()})})}
+    catch(e){S.fs=fb.getFirestore(app)}
+    S.assets=true;S.db=true;
+  }catch(e){console.error(e);clearTimeout(slow);S.status="nodb";render();return}
+  fb.getRedirectResult(S.auth).catch(function(e){var m=authError(e);if(m)toast(m)});
+  fb.onAuthStateChanged(S.auth,function(u){
+    if(!u){
+      S.uid=null;S.anon=true;S.account=null;
+    }else{
+      S.uid=u.uid;S.anon=u.isAnonymous;
+      var prov=u.isAnonymous?"anonymous":(u.uid.indexOf("kakao_")===0?"kakao":u.uid.indexOf("naver_")===0?"naver":
+        ((u.providerData[0]||{}).providerId==="google.com"?"google":"email"));
+      S.account=u.isAnonymous?null:{name:u.displayName||"",email:u.email||"",provider:prov};
+    }
+    S.ver++;refresh();
+  });
+  ["stores","reviews","replies","likes","favs"].forEach(listen);
+})();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,116 @@
+rules_version = '2';
+
+// 동네평 Firestore 보안 규칙
+// - 누구나 읽을 수 있고, 쓰기는 로그인한 사람(익명 제외)만 자기 것만 할 수 있습니다.
+// - 사장님은 손님 리뷰를 지울 수 없고 답글만 달 수 있습니다.
+// - 같은 동네·같은 주소(주소가 없으면 같은 이름)의 가게는 addrKeys 잠금 문서로 한 번만 등록됩니다.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null
+        && request.auth.token.firebase.sign_in_provider != 'anonymous';
+    }
+    function me() { return request.auth.uid; }
+    function str(v, min, max) { return v is string && v.size() >= min && v.size() <= max; }
+    function optStr(d, k, max) { return !(k in d) || (d[k] is string && d[k].size() <= max); }
+    function optList(d, k, max) { return !(k in d) || (d[k] is list && d[k].size() <= max); }
+
+    function validStore(d) {
+      return str(d.name, 2, 30)
+        && str(d.area, 1, 30)
+        && str(d.cat, 1, 30)
+        && optStr(d, 'address', 80)
+        && optStr(d, 'hours', 60)
+        && optStr(d, 'phone', 20)
+        && optStr(d, 'menu', 80)
+        && optStr(d, 'desc', 600)
+        && optStr(d, 'photo', 40)
+        && optList(d, 'photos', 10)
+        && optList(d, 'closed', 11)
+        && d.createdAt is number
+        && str(d.addrKey, 10, 100);
+    }
+
+    match /stores/{storeId} {
+      allow read: if true;
+      allow create: if signedIn()
+        && request.resource.data.ownerId == me()
+        && validStore(request.resource.data)
+        && getAfter(/databases/$(database)/documents/addrKeys/$(request.resource.data.addrKey)).data.storeId == storeId;
+      allow update: if signedIn()
+        && resource.data.ownerId == me()
+        && request.resource.data.ownerId == me()
+        && validStore(request.resource.data)
+        && getAfter(/databases/$(database)/documents/addrKeys/$(request.resource.data.addrKey)).data.storeId == storeId;
+      allow delete: if signedIn() && resource.data.ownerId == me();
+    }
+
+    // 중복 등록 잠금: 한 주소 키는 한 가게만 가질 수 있고, 다른 사람이 가져갈 수 없습니다(update 없음).
+    match /addrKeys/{key} {
+      allow read: if true;
+      allow create: if signedIn()
+        && request.resource.data.ownerId == me()
+        && getAfter(/databases/$(database)/documents/stores/$(request.resource.data.storeId)).data.ownerId == me()
+        && getAfter(/databases/$(database)/documents/stores/$(request.resource.data.storeId)).data.addrKey == key;
+      allow delete: if signedIn() && resource.data.ownerId == me();
+    }
+
+    // 리뷰 문서 ID = {가게ID}_{작성자uid} → 한 가게에 한 사람당 리뷰 1개
+    match /reviews/{rid} {
+      allow read: if true;
+      allow create, update: if signedIn()
+        && request.resource.data.authorId == me()
+        && rid == request.resource.data.storeId + '_' + me()
+        && exists(/databases/$(database)/documents/stores/$(request.resource.data.storeId))
+        && get(/databases/$(database)/documents/stores/$(request.resource.data.storeId)).data.ownerId != me()
+        && request.resource.data.rating is int
+        && request.resource.data.rating >= 1 && request.resource.data.rating <= 5
+        && str(request.resource.data.text, 5, 1000)
+        && optStr(request.resource.data, 'nick', 12)
+        && optList(request.resource.data, 'photos', 3)
+        && request.resource.data.createdAt is number;
+      allow delete: if signedIn() && resource.data.authorId == me();
+    }
+
+    // 사장님 답글: 그 가게 주인만 쓰고 지울 수 있습니다.
+    match /replies/{rid} {
+      allow read: if true;
+      allow create, update: if signedIn()
+        && request.resource.data.ownerId == me()
+        && get(/databases/$(database)/documents/stores/$(request.resource.data.storeId)).data.ownerId == me()
+        && rid == request.resource.data.storeId + '_' + request.resource.data.authorId
+        && str(request.resource.data.text, 1, 500);
+      allow delete: if signedIn() && resource.data.ownerId == me();
+    }
+
+    match /likes/{lid} {
+      allow read: if true;
+      allow create, update: if signedIn()
+        && request.resource.data.uid == me()
+        && lid == request.resource.data.key + '__' + me()
+        && request.resource.data.at is number;
+      allow delete: if signedIn() && resource.data.uid == me();
+    }
+
+    match /favs/{fid} {
+      allow read: if true;
+      allow create, update: if signedIn()
+        && request.resource.data.uid == me()
+        && fid == request.resource.data.storeId + '_' + me()
+        && request.resource.data.at is number;
+      allow delete: if signedIn() && resource.data.uid == me();
+    }
+
+    // 사진 (무료 요금제라 Storage 대신 Firestore에 압축 이미지로 저장). 한 장에 1MB 미만.
+    match /photos/{pid} {
+      allow read: if true;
+      allow create: if signedIn()
+        && request.resource.data.ownerId == me()
+        && request.resource.data.data is string
+        && request.resource.data.data.size() < 1000000
+        && request.resource.data.at is number;
+      allow delete: if signedIn() && resource.data.ownerId == me();
+    }
+  }
+}
