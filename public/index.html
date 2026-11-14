@@ -13,6 +13,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Do+Hyeon&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
+a,button,input,select,textarea,label{touch-action:manipulation}
 /* Layout idea: a local-life app shell. Sticky header (top tabs + search), category icon pager, two pick cards, then a two-column photo feed. Shops without photos appear as street signboards (간판); the brand mark is a red ink stamp (도장). */
 :root{
   --desk:#E4E6E5; --bg:#F2F2F0; --surface:#FFFFFF; --fill:#F1F1EF; --press:#E8E8E5;
@@ -1825,14 +1826,26 @@ function typing(){
   var a=document.activeElement;
   return !!(a&&a.matches&&a.matches("input,textarea,select")&&document.getElementById("app").contains(a));
 }
+/* 손가락(마우스)이 눌려 있는 동안 화면을 새로 그리면, 누르던 버튼이 사라져 탭이 무시돼요.
+   그래서 누르는 중에는 다시 그리기를 미뤘다가, 탭이 끝난 뒤(클릭 처리 후)에 그려요. */
+var pressing=false,flushTimer=0;
+function flushPending(){
+  clearTimeout(flushTimer);
+  flushTimer=setTimeout(function(){if(S.pending&&!pressing&&!typing()&&!S.sheet){S.pending=false;refresh()}},400);
+}
+document.addEventListener("pointerdown",function(){pressing=true;clearTimeout(flushTimer)},true);
+document.addEventListener("touchstart",function(){pressing=true;clearTimeout(flushTimer)},{capture:true,passive:true});
+["pointerup","pointercancel","touchend","touchcancel"].forEach(function(ev){
+  document.addEventListener(ev,function(){pressing=false;flushPending()},{capture:true,passive:true});
+});
 function refresh(){
-  if(typing()){S.pending=true;return}
+  if(typing()||pressing){S.pending=true;return}
   var y=scroller.scrollTop,pg=document.querySelector(".catpager"),px=pg?pg.scrollLeft:0;
   render();
   scroller.scrollTop=y;
   var pg2=document.querySelector(".catpager");if(pg2&&px)pg2.scrollLeft=px;
 }
-document.addEventListener("focusout",function(){setTimeout(function(){if(S.pending&&!typing()&&!S.sheet){S.pending=false;refresh()}},0)});
+document.addEventListener("focusout",flushPending);
 window.addEventListener("hashchange",function(){closeSheet(true);S.pending=false;render()});
 
 /* ---------- boot (Firebase) ---------- */
