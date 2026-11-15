@@ -16,7 +16,14 @@ service cloud.firestore {
     function verified() {
       return signedIn() && request.auth.token.email_verified == true;
     }
+    // 마스터(관리자) 계정: 이 이메일로 인증된 계정은 모든 가게·리뷰·답글 등을 지울 수 있습니다.
+    function isAdmin() {
+      return request.auth != null
+        && request.auth.token.email == 'dongnaepyeong@gmail.com'
+        && request.auth.token.email_verified == true;
+    }
     function me() { return request.auth.uid; }
+    function optBool(d, k) { return !(k in d) || d[k] is bool; }
     function str(v, min, max) { return v is string && v.size() >= min && v.size() <= max; }
     function optStr(d, k, max) { return !(k in d) || (d[k] is string && d[k].size() <= max); }
     function optList(d, k, max) { return !(k in d) || (d[k] is list && d[k].size() <= max); }
@@ -34,6 +41,8 @@ service cloud.firestore {
         && optList(d, 'photos', 10)
         && optStr(d, 'video', 40)
         && optStr(d, 'ownerName', 20)
+        && optBool(d, 'chain')
+        && optBool(d, 'reserve')
         && optList(d, 'closed', 11)
         && d.createdAt is number
         && str(d.addrKey, 10, 100);
@@ -44,13 +53,15 @@ service cloud.firestore {
       allow create: if verified()
         && request.resource.data.ownerId == me()
         && validStore(request.resource.data)
+        && (!('ownerName' in request.resource.data) || request.resource.data.ownerName == getAfter(/databases/$(database)/documents/bosses/$(me())).data.name)
         && getAfter(/databases/$(database)/documents/addrKeys/$(request.resource.data.addrKey)).data.storeId == storeId;
       allow update: if verified()
         && resource.data.ownerId == me()
         && request.resource.data.ownerId == me()
         && validStore(request.resource.data)
+        && (!('ownerName' in request.resource.data) || request.resource.data.ownerName == getAfter(/databases/$(database)/documents/bosses/$(me())).data.name)
         && getAfter(/databases/$(database)/documents/addrKeys/$(request.resource.data.addrKey)).data.storeId == storeId;
-      allow delete: if signedIn() && resource.data.ownerId == me();
+      allow delete: if (signedIn() && resource.data.ownerId == me()) || isAdmin();
     }
 
     // 중복 등록 잠금: 한 주소 키는 한 가게만 가질 수 있고, 다른 사람이 가져갈 수 없습니다(update 없음).
@@ -60,7 +71,7 @@ service cloud.firestore {
         && request.resource.data.ownerId == me()
         && getAfter(/databases/$(database)/documents/stores/$(request.resource.data.storeId)).data.ownerId == me()
         && getAfter(/databases/$(database)/documents/stores/$(request.resource.data.storeId)).data.addrKey == key;
-      allow delete: if signedIn() && resource.data.ownerId == me();
+      allow delete: if (signedIn() && resource.data.ownerId == me()) || isAdmin();
     }
 
     // 리뷰 문서 ID = {가게ID}_{작성자uid} → 한 가게에 한 사람당 리뷰 1개
@@ -78,7 +89,7 @@ service cloud.firestore {
         && optList(request.resource.data, 'photos', 3)
         && optStr(request.resource.data, 'video', 40)
         && request.resource.data.createdAt is number;
-      allow delete: if signedIn() && resource.data.authorId == me();
+      allow delete: if (signedIn() && resource.data.authorId == me()) || isAdmin();
     }
 
     // 사장님 답글: 그 가게 주인만 쓰고 지울 수 있습니다.
@@ -89,7 +100,7 @@ service cloud.firestore {
         && get(/databases/$(database)/documents/stores/$(request.resource.data.storeId)).data.ownerId == me()
         && rid == request.resource.data.storeId + '_' + request.resource.data.authorId
         && str(request.resource.data.text, 1, 500);
-      allow delete: if signedIn() && resource.data.ownerId == me();
+      allow delete: if (signedIn() && resource.data.ownerId == me()) || isAdmin();
     }
 
     match /likes/{lid} {
@@ -98,7 +109,7 @@ service cloud.firestore {
         && request.resource.data.uid == me()
         && lid == request.resource.data.key + '__' + me()
         && request.resource.data.at is number;
-      allow delete: if signedIn() && resource.data.uid == me();
+      allow delete: if (signedIn() && resource.data.uid == me()) || isAdmin();
     }
 
     match /favs/{fid} {
@@ -107,7 +118,7 @@ service cloud.firestore {
         && request.resource.data.uid == me()
         && fid == request.resource.data.storeId + '_' + me()
         && request.resource.data.at is number;
-      allow delete: if signedIn() && resource.data.uid == me();
+      allow delete: if (signedIn() && resource.data.uid == me()) || isAdmin();
     }
 
     // 사진 (무료 요금제라 Storage 대신 Firestore에 압축 이미지로 저장). 한 장에 1MB 미만.
@@ -118,7 +129,7 @@ service cloud.firestore {
         && request.resource.data.data is string
         && request.resource.data.data.size() < 1000000
         && request.resource.data.at is number;
-      allow delete: if signedIn() && resource.data.ownerId == me();
+      allow delete: if (signedIn() && resource.data.ownerId == me()) || isAdmin();
     }
     // 프로필: 닉네임#태그. 닉네임은 겹쳐도 되지만 조합(handles 잠금 문서)은 한 사람만.
     // 닉네임·태그는 마지막으로 바꾼 뒤 90일이 지나야 다시 바꿀 수 있고, 사진은 언제든 바꿀 수 있습니다.
@@ -146,7 +157,7 @@ service cloud.firestore {
             && request.resource.data.nameAt == request.time
             && getAfter(/databases/$(database)/documents/handles/$(hkey(request.resource.data))).data.uid == me())
         );
-      allow delete: if signedIn() && uid == me();
+      allow delete: if (signedIn() && uid == me()) || isAdmin();
     }
     // 닉네임#태그 잠금: 이미 있으면 다른 사람이 만들 수 없음(update 없음).
     match /handles/{key} {
@@ -154,7 +165,7 @@ service cloud.firestore {
       allow create: if verified()
         && request.resource.data.uid == me()
         && key == hkey(getAfter(/databases/$(database)/documents/users/$(me())).data);
-      allow delete: if signedIn() && resource.data.uid == me();
+      allow delete: if (signedIn() && resource.data.uid == me()) || isAdmin();
     }
 
     // 영상 (무료 요금제라 Storage 대신 0.9MB 조각으로 저장). 조각 최대 8개(약 7MB).
@@ -165,7 +176,7 @@ service cloud.firestore {
         && request.resource.data.n is int
         && request.resource.data.n >= 1 && request.resource.data.n <= 8
         && request.resource.data.at is number;
-      allow delete: if signedIn() && resource.data.ownerId == me();
+      allow delete: if (signedIn() && resource.data.ownerId == me()) || isAdmin();
       match /c/{ci} {
         allow read: if true;
         allow create: if verified()
@@ -174,8 +185,61 @@ service cloud.firestore {
           && request.resource.data.data.size() <= 900000
           && (!exists(/databases/$(database)/documents/videos/$(vid))
             || get(/databases/$(database)/documents/videos/$(vid)).data.ownerId == me());
-        allow delete: if signedIn() && resource.data.ownerId == me();
+        allow delete: if (signedIn() && resource.data.ownerId == me()) || isAdmin();
       }
+    }
+    // 사장님 이름: 한 사람당 하나, 다른 사람과 겹치면 안 됨(bossNames 잠금 문서).
+    function bkey(n) { return n.lower().replace('\\s', ''); }
+    match /bosses/{uid} {
+      allow read: if true;
+      allow create, update: if verified() && uid == me()
+        && request.resource.data.keys().hasOnly(['name', 'at'])
+        && request.resource.data.name is string
+        && request.resource.data.name.matches('^[0-9A-Za-z가-힣][0-9A-Za-z가-힣 ._·&()\\-]{0,19}$')
+        && getAfter(/databases/$(database)/documents/bossNames/$(bkey(request.resource.data.name))).data.uid == me();
+      allow delete: if (signedIn() && uid == me()) || isAdmin();
+    }
+    match /bossNames/{key} {
+      allow read: if true;
+      allow create: if verified()
+        && request.resource.data.uid == me()
+        && key == bkey(getAfter(/databases/$(database)/documents/bosses/$(me())).data.name);
+      allow delete: if (signedIn() && resource.data.uid == me()) || isAdmin();
+    }
+
+    // 예약: 신청한 손님, 그 가게 사장님, 관리자만 볼 수 있습니다.
+    match /reservations/{rid} {
+      allow read: if signedIn() && (resource.data.uid == me() || resource.data.ownerId == me() || isAdmin());
+      allow create: if verified()
+        && request.resource.data.uid == me()
+        && request.resource.data.ownerId != me()
+        && request.resource.data.ownerId == get(/databases/$(database)/documents/stores/$(request.resource.data.storeId)).data.ownerId
+        && get(/databases/$(database)/documents/stores/$(request.resource.data.storeId)).data.reserve == true
+        && request.resource.data.status == 'pending'
+        && str(request.resource.data.date, 10, 10)
+        && str(request.resource.data.time, 5, 5)
+        && request.resource.data.people is int
+        && request.resource.data.people >= 1 && request.resource.data.people <= 50
+        && optStr(request.resource.data, 'note', 200)
+        && str(request.resource.data.storeName, 1, 30)
+        && str(request.resource.data.who, 1, 20)
+        && request.resource.data.at is number;
+      allow update: if signedIn()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])
+        && ((resource.data.ownerId == me() && request.resource.data.status in ['accepted', 'declined'])
+          || (resource.data.uid == me() && request.resource.data.status == 'cancelled'));
+      allow delete: if signedIn() && (resource.data.uid == me() || resource.data.ownerId == me()) || isAdmin();
+    }
+
+    // 신고: 로그인한 사람이 보내고, 관리자만 읽고 지웁니다.
+    match /reports/{id} {
+      allow create: if verified()
+        && request.resource.data.uid == me()
+        && request.resource.data.type in ['bug', 'review']
+        && optStr(request.resource.data, 'text', 1000)
+        && optStr(request.resource.data, 'reason', 60)
+        && request.resource.data.at is number;
+      allow read, delete: if isAdmin();
     }
   }
 }
