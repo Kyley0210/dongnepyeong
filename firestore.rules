@@ -89,7 +89,10 @@ service cloud.firestore {
         && optList(request.resource.data, 'photos', 3)
         && optStr(request.resource.data, 'video', 40)
         && request.resource.data.createdAt is number;
-      allow delete: if (signedIn() && resource.data.authorId == me()) || isAdmin();
+      // 작성자, 그 가게 사장님, 관리자가 지울 수 있습니다.
+      allow delete: if (signedIn() && resource.data.authorId == me())
+        || (signedIn() && get(/databases/$(database)/documents/stores/$(resource.data.storeId)).data.ownerId == me())
+        || isAdmin();
     }
 
     // 사장님 답글: 그 가게 주인만 쓰고 지울 수 있습니다.
@@ -223,11 +226,23 @@ service cloud.firestore {
         && optStr(request.resource.data, 'note', 200)
         && str(request.resource.data.storeName, 1, 30)
         && str(request.resource.data.who, 1, 20)
-        && request.resource.data.at is number;
-      allow update: if signedIn()
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])
-        && ((resource.data.ownerId == me() && request.resource.data.status in ['accepted', 'declined'])
-          || (resource.data.uid == me() && request.resource.data.status == 'cancelled'));
+        && request.resource.data.at is number
+        // 이미 확정된 시간(slots)은 신청할 수 없음
+        && !(exists(/databases/$(database)/documents/slots/$(request.resource.data.storeId + '_' + request.resource.data.date))
+          && request.resource.data.time in get(/databases/$(database)/documents/slots/$(request.resource.data.storeId + '_' + request.resource.data.date)).data.times);
+      // 사장님: 수락/거절(+사유), 기록 숨기기(hideO). 손님: 취소, 기록 숨기기(hideU).
+      allow update: if signedIn() && (
+          (resource.data.ownerId == me()
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'reason', 'statusAt'])
+            && request.resource.data.status in ['accepted', 'declined']
+            && optStr(request.resource.data, 'reason', 300))
+          || (resource.data.ownerId == me()
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['hideO']))
+          || (resource.data.uid == me()
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'statusAt'])
+            && request.resource.data.status == 'cancelled')
+          || (resource.data.uid == me()
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['hideU'])));
       allow delete: if signedIn() && (resource.data.uid == me() || resource.data.ownerId == me()) || isAdmin();
     }
 
@@ -240,6 +255,36 @@ service cloud.firestore {
         && optStr(request.resource.data, 'reason', 60)
         && request.resource.data.at is number;
       allow read, delete: if isAdmin();
+    }
+    // 예약 마감 시간표: 사장님 기기가 확정된 예약 시간을 적어 둠. 누구나 읽을 수 있음(시간만, 손님 정보 없음).
+    match /slots/{sid} {
+      allow read: if true;
+      allow create, update: if verified()
+        && request.resource.data.ownerId == me()
+        && sid == request.resource.data.storeId + '_' + request.resource.data.date
+        && get(/databases/$(database)/documents/stores/$(request.resource.data.storeId)).data.ownerId == me()
+        && request.resource.data.times is list
+        && request.resource.data.times.size() <= 48;
+      allow delete: if (signedIn() && resource.data.ownerId == me()) || isAdmin();
+    }
+
+    // 삭제 안내 알림: 관리자는 누구에게나, 사장님은 자기 가게 리뷰를 지울 때 그 작성자에게만 보낼 수 있음.
+    match /notices/{nid} {
+      allow read: if signedIn() && resource.data.to == me();
+      allow update: if signedIn() && resource.data.to == me()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read']);
+      allow delete: if (signedIn() && resource.data.to == me()) || isAdmin();
+      allow create: if verified()
+        && request.resource.data.from == me()
+        && request.resource.data.read == false
+        && request.resource.data.at is number
+        && str(request.resource.data.reason, 1, 300)
+        && request.resource.data.type in ['review-deleted', 'store-deleted', 'reply-deleted']
+        && (isAdmin()
+          || (request.resource.data.type == 'review-deleted'
+            && request.resource.data.by == 'owner'
+            && get(/databases/$(database)/documents/stores/$(request.resource.data.storeId)).data.ownerId == me()
+            && exists(/databases/$(database)/documents/reviews/$(request.resource.data.storeId + '_' + request.resource.data.to))));
     }
   }
 }
