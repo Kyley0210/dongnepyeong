@@ -1,7 +1,7 @@
 rules_version = '2';
 
 // 동네평 Firestore 보안 규칙
-// - 누구나 읽을 수 있고, 쓰기는 로그인한 사람(익명 제외)만 자기 것만 할 수 있습니다.
+// - 누구나 읽을 수 있고, 쓰기는 이메일 인증을 마친 로그인 사용자(익명 제외)만 자기 것만 할 수 있습니다.
 // - 사장님은 손님 리뷰를 지울 수 없고 답글만 달 수 있습니다.
 // - 같은 동네·같은 주소(주소가 없으면 같은 이름)의 가게는 addrKeys 잠금 문서로 한 번만 등록됩니다.
 service cloud.firestore {
@@ -10,6 +10,11 @@ service cloud.firestore {
     function signedIn() {
       return request.auth != null
         && request.auth.token.firebase.sign_in_provider != 'anonymous';
+    }
+    // 이메일 인증까지 마친 사람만 새로 쓰거나 고칠 수 있습니다(구글 로그인은 이미 인증됨).
+    // 지우기는 signedIn()만 확인 → 인증 전이라도 계정 삭제 때 자기 것을 지울 수 있습니다.
+    function verified() {
+      return signedIn() && request.auth.token.email_verified == true;
     }
     function me() { return request.auth.uid; }
     function str(v, min, max) { return v is string && v.size() >= min && v.size() <= max; }
@@ -34,11 +39,11 @@ service cloud.firestore {
 
     match /stores/{storeId} {
       allow read: if true;
-      allow create: if signedIn()
+      allow create: if verified()
         && request.resource.data.ownerId == me()
         && validStore(request.resource.data)
         && getAfter(/databases/$(database)/documents/addrKeys/$(request.resource.data.addrKey)).data.storeId == storeId;
-      allow update: if signedIn()
+      allow update: if verified()
         && resource.data.ownerId == me()
         && request.resource.data.ownerId == me()
         && validStore(request.resource.data)
@@ -49,7 +54,7 @@ service cloud.firestore {
     // 중복 등록 잠금: 한 주소 키는 한 가게만 가질 수 있고, 다른 사람이 가져갈 수 없습니다(update 없음).
     match /addrKeys/{key} {
       allow read: if true;
-      allow create: if signedIn()
+      allow create: if verified()
         && request.resource.data.ownerId == me()
         && getAfter(/databases/$(database)/documents/stores/$(request.resource.data.storeId)).data.ownerId == me()
         && getAfter(/databases/$(database)/documents/stores/$(request.resource.data.storeId)).data.addrKey == key;
@@ -59,7 +64,7 @@ service cloud.firestore {
     // 리뷰 문서 ID = {가게ID}_{작성자uid} → 한 가게에 한 사람당 리뷰 1개
     match /reviews/{rid} {
       allow read: if true;
-      allow create, update: if signedIn()
+      allow create, update: if verified()
         && request.resource.data.authorId == me()
         && rid == request.resource.data.storeId + '_' + me()
         && exists(/databases/$(database)/documents/stores/$(request.resource.data.storeId))
@@ -76,7 +81,7 @@ service cloud.firestore {
     // 사장님 답글: 그 가게 주인만 쓰고 지울 수 있습니다.
     match /replies/{rid} {
       allow read: if true;
-      allow create, update: if signedIn()
+      allow create, update: if verified()
         && request.resource.data.ownerId == me()
         && get(/databases/$(database)/documents/stores/$(request.resource.data.storeId)).data.ownerId == me()
         && rid == request.resource.data.storeId + '_' + request.resource.data.authorId
@@ -86,7 +91,7 @@ service cloud.firestore {
 
     match /likes/{lid} {
       allow read: if true;
-      allow create, update: if signedIn()
+      allow create, update: if verified()
         && request.resource.data.uid == me()
         && lid == request.resource.data.key + '__' + me()
         && request.resource.data.at is number;
@@ -95,7 +100,7 @@ service cloud.firestore {
 
     match /favs/{fid} {
       allow read: if true;
-      allow create, update: if signedIn()
+      allow create, update: if verified()
         && request.resource.data.uid == me()
         && fid == request.resource.data.storeId + '_' + me()
         && request.resource.data.at is number;
@@ -105,7 +110,7 @@ service cloud.firestore {
     // 사진 (무료 요금제라 Storage 대신 Firestore에 압축 이미지로 저장). 한 장에 1MB 미만.
     match /photos/{pid} {
       allow read: if true;
-      allow create: if signedIn()
+      allow create: if verified()
         && request.resource.data.ownerId == me()
         && request.resource.data.data is string
         && request.resource.data.data.size() < 1000000
