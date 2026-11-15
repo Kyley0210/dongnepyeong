@@ -32,6 +32,8 @@ service cloud.firestore {
         && optStr(d, 'desc', 600)
         && optStr(d, 'photo', 40)
         && optList(d, 'photos', 10)
+        && optStr(d, 'video', 40)
+        && optStr(d, 'ownerName', 20)
         && optList(d, 'closed', 11)
         && d.createdAt is number
         && str(d.addrKey, 10, 100);
@@ -74,6 +76,7 @@ service cloud.firestore {
         && str(request.resource.data.text, 5, 1000)
         && optStr(request.resource.data, 'nick', 12)
         && optList(request.resource.data, 'photos', 3)
+        && optStr(request.resource.data, 'video', 40)
         && request.resource.data.createdAt is number;
       allow delete: if signedIn() && resource.data.authorId == me();
     }
@@ -116,6 +119,63 @@ service cloud.firestore {
         && request.resource.data.data.size() < 1000000
         && request.resource.data.at is number;
       allow delete: if signedIn() && resource.data.ownerId == me();
+    }
+    // 프로필: 닉네임#태그. 닉네임은 겹쳐도 되지만 조합(handles 잠금 문서)은 한 사람만.
+    // 닉네임·태그는 마지막으로 바꾼 뒤 90일이 지나야 다시 바꿀 수 있고, 사진은 언제든 바꿀 수 있습니다.
+    function hkey(d) { return d.name.lower() + '#' + d.tag.lower(); }
+    function validProfile(d) {
+      return d.keys().hasOnly(['name', 'tag', 'avatar', 'nameAt', 'createdAt'])
+        && d.name is string && d.name.matches('^[0-9A-Za-z가-힣_]{2,12}$')
+        && d.tag is string && d.tag.matches('^[0-9A-Za-z가-힣]{2,5}$')
+        && optStr(d, 'avatar', 40)
+        && d.nameAt is timestamp;
+    }
+    match /users/{uid} {
+      allow read: if true;
+      allow create: if verified() && uid == me()
+        && validProfile(request.resource.data)
+        && request.resource.data.nameAt == request.time
+        && getAfter(/databases/$(database)/documents/handles/$(hkey(request.resource.data))).data.uid == me();
+      allow update: if verified() && uid == me()
+        && validProfile(request.resource.data)
+        && (
+          (request.resource.data.name == resource.data.name
+            && request.resource.data.tag == resource.data.tag
+            && request.resource.data.nameAt == resource.data.nameAt)
+          || (request.time > resource.data.nameAt + duration.value(90, 'd')
+            && request.resource.data.nameAt == request.time
+            && getAfter(/databases/$(database)/documents/handles/$(hkey(request.resource.data))).data.uid == me())
+        );
+      allow delete: if signedIn() && uid == me();
+    }
+    // 닉네임#태그 잠금: 이미 있으면 다른 사람이 만들 수 없음(update 없음).
+    match /handles/{key} {
+      allow read: if true;
+      allow create: if verified()
+        && request.resource.data.uid == me()
+        && key == hkey(getAfter(/databases/$(database)/documents/users/$(me())).data);
+      allow delete: if signedIn() && resource.data.uid == me();
+    }
+
+    // 영상 (무료 요금제라 Storage 대신 0.9MB 조각으로 저장). 조각 최대 8개(약 7MB).
+    match /videos/{vid} {
+      allow read: if true;
+      allow create: if verified()
+        && request.resource.data.ownerId == me()
+        && request.resource.data.n is int
+        && request.resource.data.n >= 1 && request.resource.data.n <= 8
+        && request.resource.data.at is number;
+      allow delete: if signedIn() && resource.data.ownerId == me();
+      match /c/{ci} {
+        allow read: if true;
+        allow create: if verified()
+          && request.resource.data.ownerId == me()
+          && request.resource.data.data is bytes
+          && request.resource.data.data.size() <= 900000
+          && (!exists(/databases/$(database)/documents/videos/$(vid))
+            || get(/databases/$(database)/documents/videos/$(vid)).data.ownerId == me());
+        allow delete: if signedIn() && resource.data.ownerId == me();
+      }
     }
   }
 }
