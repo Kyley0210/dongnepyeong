@@ -247,6 +247,7 @@ service cloud.firestore {
             && optStr(request.resource.data, 'cancelReason', 300)
             && request.resource.data.cancelledBy == (resource.data.ownerId == me() ? 'owner' : 'user'))
           || (resource.data.uid == me()
+            && resource.data.status in ['declined', 'cancelled']
             && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['hideU'])));
       allow delete: if signedIn() && (resource.data.uid == me() || resource.data.ownerId == me()) || isAdmin();
     }
