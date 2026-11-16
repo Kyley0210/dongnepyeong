@@ -237,6 +237,7 @@ service cloud.firestore {
             && request.resource.data.status in ['accepted', 'declined']
             && optStr(request.resource.data, 'reason', 300))
           || (resource.data.ownerId == me()
+            && resource.data.status in ['declined', 'cancelled']
             && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['hideO']))
           // 확정 전·후 모두 양쪽이 취소 가능(사유 포함)
           || ((resource.data.uid == me() || resource.data.ownerId == me())
