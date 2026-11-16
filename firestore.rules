@@ -238,9 +238,13 @@ service cloud.firestore {
             && optStr(request.resource.data, 'reason', 300))
           || (resource.data.ownerId == me()
             && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['hideO']))
-          || (resource.data.uid == me()
-            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'statusAt'])
-            && request.resource.data.status == 'cancelled')
+          // 확정 전·후 모두 양쪽이 취소 가능(사유 포함)
+          || ((resource.data.uid == me() || resource.data.ownerId == me())
+            && resource.data.status in ['pending', 'accepted']
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'statusAt', 'cancelReason', 'cancelledBy'])
+            && request.resource.data.status == 'cancelled'
+            && optStr(request.resource.data, 'cancelReason', 300)
+            && request.resource.data.cancelledBy == (resource.data.ownerId == me() ? 'owner' : 'user'))
           || (resource.data.uid == me()
             && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['hideU'])));
       allow delete: if signedIn() && (resource.data.uid == me() || resource.data.ownerId == me()) || isAdmin();
@@ -285,6 +289,18 @@ service cloud.firestore {
             && request.resource.data.by == 'owner'
             && get(/databases/$(database)/documents/stores/$(request.resource.data.storeId)).data.ownerId == me()
             && exists(/databases/$(database)/documents/reviews/$(request.resource.data.storeId + '_' + request.resource.data.to))));
+    }
+    // 팔로우: 문서 ID = 나_상대. 내 팔로우만 만들고 지움(상대도 나를 팔로워에서 지울 수 있음).
+    match /follows/{fid} {
+      allow read: if true;
+      allow create: if verified()
+        && request.resource.data.keys().hasOnly(['from', 'to', 'at'])
+        && request.resource.data.from == me()
+        && request.resource.data.to is string
+        && request.resource.data.to != me()
+        && fid == me() + '_' + request.resource.data.to
+        && request.resource.data.at is number;
+      allow delete: if (signedIn() && (resource.data.from == me() || resource.data.to == me())) || isAdmin();
     }
   }
 }
